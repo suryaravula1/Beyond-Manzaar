@@ -1,10 +1,5 @@
-.DS_Store
-*.jpg
-*.glb
-*.hdr
-*.mp3
-*.wav
-beyond-manzanar-2026-07-31-6wErk78Y/js/
-beyond-manzanar-2026-07-31-6wErk78Y/fonts/
-beyond-manzanar-2026-07-31-6wErk78Y/styles/
-beyond-manzanar-2026-07-31-6wErk78Y/artworks/
+# Version only the NAC script — ignore everything else in this folder
+*
+!.gitignore
+!beyond-manzanar-2026-07-31-6wErk78Y/
+!beyond-manzanar-2026-07-31-6wErk78Y/custom-script.js

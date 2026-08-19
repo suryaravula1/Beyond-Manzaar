@@ -20,7 +20,7 @@ const CONFIG = {
   cameraTweenMs: 1200,
   walkSpeed: 1,
   lockedSpeed: 0,
-  hideTriggerCube: false,
+  hideTriggerCube: true,
   oneWay: false,
   debugEntry: false,
 
@@ -574,16 +574,20 @@ function setupProximityEntry() {
   const trigger = getTrigger();
   if (!trigger) return;
 
+  //state.proximityWired = true;
   state.proximityWired = true;
-  try {
-    nac.setArtworkOpacity(trigger, CONFIG.hideTriggerCube ? 0 : 1);
-  } catch (e) {}
+try {
+  nac.setArtworkOpacity(trigger, CONFIG.hideTriggerCube ? 0 : 1);
+} catch (e) {}
 
-  if (typeof nac.onUserAvatarEntersArtworkRadius === 'function') {
-    nac.onUserAvatarEntersArtworkRadius(trigger, CONFIG.triggerRadius, function () {
-      startForcedPush();
-    });
-  }
+if (CONFIG.hideTriggerCube && trigger.object3D) {
+  trigger.object3D.visible = false;
+}
+if (typeof nac.onUserAvatarEntersArtworkRadius === 'function') {
+  nac.onUserAvatarEntersArtworkRadius(trigger, CONFIG.triggerRadius, function () {
+    startForcedPush();
+  });
+}
 }
 
 space.beforeInit = () => {

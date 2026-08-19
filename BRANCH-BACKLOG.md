@@ -1,9 +1,12 @@
 # Branch backlog — Test Realm script
 
+**Remote:** [https://github.com/suryaravula1/Beyond-Manzaar](https://github.com/suryaravula1/Beyond-Manzaar)
+
 Git tracks **only** `beyond-manzanar-2026-07-31-6wErk78Y/custom-script.js` (plus this file).
 Paste that script into the NAC Script Editor for Test Realm.
 
 When you create a new branch, add a row here before you start changing the script.
+After you commit, push with: `git push -u origin <branch-name>`
 
 ---
 

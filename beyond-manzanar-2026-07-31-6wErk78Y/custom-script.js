@@ -243,9 +243,9 @@ function isInBesideStairsZone(x, z, box) {
   if (isInShojiDoorGap(x, z, box)) return false; // stair opening stays open (same as entry)
 
   const side = CONFIG.shoji.stairsSide;
-  const run = Math.max(CONFIG.shoji.stairRun, 2) + 3; // extend farther onto empty land outside
-  // How far into the temple from the stairs face the barrier reaches (catch corridor → empty land)
-  const edgeIn = 3.5;
+  const run = Math.max(CONFIG.shoji.stairRun, 2) + 1.5; // empty land outside stairs face
+  // How far into the temple from the stairs face the barrier reaches
+  const edgeIn = 2.2;
 
   if (side === 'minZ') {
     return z >= box.min.z - run && z <= box.min.z + edgeIn;

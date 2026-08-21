@@ -26,8 +26,8 @@ After you commit, push with: `git push -u origin <branch-name>`
 
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
-| `main` | **Stable** | commit `119f724` | Barrack + jump + hidden trigger cube + shoji stairs/walls (door-passage fix). | Monument hide after audio (`481244`). Multi-door cube ID list. |
-| `shoji-v3` | **In progress** | railing collision rewrite | All railings solid (`railingInset` walkable deck); exit/enter only via `stairHalfWidth` stair strip — blocks empty land beside stairs. | Tune `railingInset` / `stairHalfWidth` if needed. |
+| `main` | **Stable** | (after shoji-v3 merge) | Barrack + jump + hidden cube + shoji stairs/walls + stairs-face railing beside door gap. | Monument hide after audio (`481244`). Multi-door cube ID list. |
+| `shoji-v3` | Merged into `main` | commit `2157775` | Stairs-face railing collision left/right of door gap — blocks elevated walk onto empty land beside stairs. | — |
 | `shoji-v2` | Merged into `main` | commit `4831cd1` | Door-passage fix: no walk-through along stairs center aisle. | — |
 | `hide-trigger-cube` | Merged into `main` | commit `4b34f2b` | Hid trigger cube (`hideTriggerCube: true` + `object3D.visible = false`). | — |
 | `test-realm-shoji-interactions` | Older snapshot | commit `662388f` | Earlier known-good shoji + barrack work (before cube hide). | Kept for history. |
@@ -54,6 +54,7 @@ Hard refresh after script changes: `Cmd+Shift+R`
 | Barrack walls | Can’t walk through walls |
 | Jump | Disabled |
 | Shoji stairs | Enter/exit only via stairs; 2 height steps |
+| Shoji beside stairs | From corridor, cannot walk past stairs-face railing onto empty land |
 | Shoji interior | Walk straight into mesh after stairs → **blocked** |
 
 ---

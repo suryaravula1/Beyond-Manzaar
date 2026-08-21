@@ -36,8 +36,9 @@ const CONFIG = {
     floorStep2: 12,
     floorInside: 12.75,
     innerShrink: 0.22,
-    doorHalfWidth: 4, // opening width on the stairs face
+    doorHalfWidth: 4, // mesh door opening (ignore mesh only here)
     doorDepth: 4, // how far from stairs face mesh hits are ignored (door only)
+    stairHalfWidth: 2.2, // enter/exit + elevated walk ONLY on this narrower stair strip
     stairRun: 5, // world units — both steps happen within this short distance
   },
 };
@@ -209,6 +210,40 @@ function isInShojiDoorGap(x, z, box) {
   return Math.abs(z - cz) <= half;
 }
 
+// Narrower than the visual door — matches the actual stairs (not empty land beside them)
+function isInStairGap(x, z, box) {
+  const side = CONFIG.shoji.stairsSide;
+  const half =
+    CONFIG.shoji.stairHalfWidth != null ? CONFIG.shoji.stairHalfWidth : CONFIG.shoji.doorHalfWidth;
+  const cx = (box.min.x + box.max.x) * 0.5;
+  const cz = (box.min.z + box.max.z) * 0.5;
+
+  if (side === 'minZ' || side === 'maxZ') {
+    return Math.abs(x - cx) <= half;
+  }
+  return Math.abs(z - cz) <= half;
+}
+
+// Stair strip = stair width × stairRun (outside) + small pad inside the door
+function isOnStairStrip(x, z, box) {
+  if (!isInStairGap(x, z, box)) return false;
+
+  const side = CONFIG.shoji.stairsSide;
+  const run = Math.max(CONFIG.shoji.stairRun, 2);
+  const padIn = 0.6;
+
+  if (side === 'minZ') {
+    return z >= box.min.z - run && z <= box.min.z + padIn;
+  }
+  if (side === 'maxZ') {
+    return z <= box.max.z + run && z >= box.max.z - padIn;
+  }
+  if (side === 'minX') {
+    return x >= box.min.x - run && x <= box.min.x + padIn;
+  }
+  return x <= box.max.x + run && x >= box.max.x - padIn;
+}
+
 // Only the stairs-face doorway — not the whole center aisle through the temple
 function isNearShojiDoorFace(x, z, box) {
   const depth = CONFIG.shoji.doorDepth != null ? CONFIG.shoji.doorDepth : 4;
@@ -230,7 +265,14 @@ function isInShojiDoorPassage(x, z, box) {
   return isInShojiDoorGap(x, z, box) && isNearShojiDoorFace(x, z, box);
 }
 
-// Solid footprint walls on all faces except the stairs door gap
+function isElevatedAtShoji() {
+  const ms = window.controls;
+  const y = ms && ms.floorLevel != null ? ms.floorLevel : null;
+  if (y == null) return false;
+  return y > CONFIG.shoji.floorDefault + 0.35;
+}
+
+// Solid footprint walls on all faces except the stair strip (not empty land beside stairs)
 function resolveShojiFootprint(prevX, prevZ, x, z, box) {
   const wasInside = isInsideBoxXZ({ x: prevX, z: prevZ }, box, 0);
   const nowInside = isInsideBoxXZ({ x: x, z: z }, box, 0);
@@ -253,12 +295,34 @@ function resolveShojiFootprint(prevX, prevZ, x, z, box) {
       (prevX > box.max.x && x <= box.max.x) || (prevX <= box.max.x && x > box.max.x);
   }
 
-  // Crossing the stairs face through the door gap is allowed (enter/exit)
-  if (crossedStairsFace && isInShojiDoorGap(x, z, box)) return null;
-  if (crossedStairsFace && isInShojiDoorGap(prevX, prevZ, box)) return null;
+  // Crossing stairs face only via the narrow stair strip
+  if (crossedStairsFace && (isOnStairStrip(x, z, box) || isOnStairStrip(prevX, prevZ, box))) {
+    return null;
+  }
+  if (crossedStairsFace && (isInStairGap(x, z, box) || isInStairGap(prevX, prevZ, box))) {
+    return null;
+  }
 
-  // Any other face (or stairs face outside the door) = solid wall
+  // Any other face (or stairs face beside the stairs) = solid wall
   return { x: prevX, z: prevZ };
+}
+
+// If elevated outside the temple, you must stay on the stair strip — not air/land beside it
+function clampElevatedBesideStairs() {
+  if (state.cameraAnimating || isEditing()) return;
+
+  const pos = getPlayerWorld();
+  const box = getShojiBox();
+  if (!pos || !box || !isElevatedAtShoji()) return;
+
+  const inside = isInsideBoxXZ(pos, box, 0);
+  if (inside) return;
+
+  if (!isOnStairStrip(pos.x, pos.z, box)) {
+    if (state.prevX != null && state.prevZ != null) {
+      setPlayerXZ(state.prevX, state.prevZ);
+    }
+  }
 }
 
 function enforceWallCollisions() {
@@ -274,7 +338,7 @@ function enforceWallCollisions() {
     return;
   }
 
-  // Shoji: block all sides except stairs door gap
+  // Shoji: block all sides except stair strip
   const shojiBox = getShojiBox();
   if (shojiBox) {
     const blocked = resolveShojiFootprint(state.prevX, state.prevZ, pos.x, pos.z, shojiBox);
@@ -345,38 +409,8 @@ function floorFromStairProgress(t) {
 }
 
 function isOnStairsApproach(pos, box) {
-  const side = CONFIG.shoji.stairsSide;
-  const half = CONFIG.shoji.doorHalfWidth + 2;
-  const cx = (box.min.x + box.max.x) * 0.5;
-  const cz = (box.min.z + box.max.z) * 0.5;
-  const reach = CONFIG.shoji.approachRadius;
-
-  if (side === 'minZ') {
-    return (
-      Math.abs(pos.x - cx) <= half &&
-      pos.z >= box.min.z - reach &&
-      pos.z <= box.max.z
-    );
-  }
-  if (side === 'maxZ') {
-    return (
-      Math.abs(pos.x - cx) <= half &&
-      pos.z <= box.max.z + reach &&
-      pos.z >= box.min.z
-    );
-  }
-  if (side === 'minX') {
-    return (
-      Math.abs(pos.z - cz) <= half &&
-      pos.x >= box.min.x - reach &&
-      pos.x <= box.max.x
-    );
-  }
-  return (
-    Math.abs(pos.z - cz) <= half &&
-    pos.x <= box.max.x + reach &&
-    pos.x >= box.min.x
-  );
+  // Height / approach only on the real stair strip — not empty land beside stairs
+  return isOnStairStrip(pos.x, pos.z, box);
 }
 
 function getShojiStepFloor(pos, box) {
@@ -397,13 +431,10 @@ function applyShojiSteps() {
 
   let target = CONFIG.shoji.floorDefault;
 
-  // Height changes only on the stairs corridor / inside — not from other sides
-  if (isInsideBoxXZ(pos, box, 0) || isOnStairsApproach(pos, box)) {
-    if (isInsideBoxXZ(pos, box, 0)) {
-      target = getShojiStepFloor(pos, box);
-    } else if (isOnStairsApproach(pos, box)) {
-      target = floorFromStairProgress(getStairProgress(pos, box));
-    }
+  if (isInsideBoxXZ(pos, box, 0)) {
+    target = getShojiStepFloor(pos, box);
+  } else if (isOnStairStrip(pos.x, pos.z, box)) {
+    target = floorFromStairProgress(getStairProgress(pos, box));
   }
 
   setPlayerFloor(target);
@@ -631,6 +662,7 @@ space.onFrame = () => {
   if (!state.proximityWired) setupProximityEntry();
   checkProximityEntry();
   applyShojiSteps();
+  clampElevatedBesideStairs();
   enforceWallCollisions();
   blockJump();
 };

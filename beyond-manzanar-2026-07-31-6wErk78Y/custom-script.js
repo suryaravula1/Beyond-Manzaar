@@ -36,9 +36,9 @@ const CONFIG = {
     floorInside: 12.75,
     innerShrink: 0.22,
     railingInset: 0.16, // shrink mesh AABB to railing (ignore roof eaves)
-    doorHalfWidth: 4, // mesh door opening (ignore mesh only near door)
+    doorHalfWidth: 4, // stairs entry/exit opening width (same for both)
     doorDepth: 4,
-    stairHalfWidth: 2.4, // ONLY opening in the railing for stairs
+    stairHalfWidth: 4, // same as doorHalfWidth — exit as wide as entry
     stairRun: 5,
   },
 };

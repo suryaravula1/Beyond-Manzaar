@@ -27,7 +27,7 @@ After you commit, push with: `git push -u origin <branch-name>`
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
 | `main` | **Stable** | commit `119f724` | Barrack + jump + hidden trigger cube + shoji stairs/walls (door-passage fix). | Monument hide after audio (`481244`). Multi-door cube ID list. |
-| `shoji-v3` | **In progress** | branched from `main` | Block exit beside stairs: enter/exit only on narrow `stairHalfWidth` strip; no elevated walk on empty land next to stairs. | Tune `stairHalfWidth` if stairs feel too narrow/wide. |
+| `shoji-v3` | **Discarded** — no useful effect | reverted to `main` script | Tried narrow `stairHalfWidth` + elevated clamp beside stairs; did not fix the bug in practice. | Keep branch for history or delete later. |
 | `shoji-v2` | Merged into `main` | commit `4831cd1` | Door-passage fix: no walk-through along stairs center aisle. | — |
 | `hide-trigger-cube` | Merged into `main` | commit `4b34f2b` | Hid trigger cube (`hideTriggerCube: true` + `object3D.visible = false`). | — |
 | `test-realm-shoji-interactions` | Older snapshot | commit `662388f` | Earlier known-good shoji + barrack work (before cube hide). | Kept for history. |
@@ -54,7 +54,6 @@ Hard refresh after script changes: `Cmd+Shift+R`
 | Barrack walls | Can’t walk through walls |
 | Jump | Disabled |
 | Shoji stairs | Enter/exit only via stairs; 2 height steps |
-| Shoji beside stairs | From inside, cannot walk out onto empty land beside stairs at temple height |
 | Shoji interior | Walk straight into mesh after stairs → **blocked** |
 
 ---

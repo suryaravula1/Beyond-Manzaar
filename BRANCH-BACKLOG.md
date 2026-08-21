@@ -26,8 +26,8 @@ After you commit, push with: `git push -u origin <branch-name>`
 
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
-| `main` | **Stable** | commit `4b34f2b` | Barrack wall collisions (`481241`). Jump disabled. Barrack entry via trigger cube (`481246`) → forced push `maxX`. Trigger cube hidden. Shoji (`481245`): stairs-side only (`stairsSide: 'minZ'`), other 3 faces solid, door gap `doorHalfWidth: 4`, two-step height on `stairRun: 5` (10 → 11.25 → 12 → 12.75 inside). | Monument hide after audio (`481244`). Multi-door cube ID list. |
-| `shoji-v2` | **In progress** | branched from `main` @ `4b34f2b` | Same as `main` for now — next shoji temple changes go here. | Shoji temple v2 adjustments (to be defined). |
+| `main` | **Stable** | commit `4831cd1` | Barrack wall collisions (`481241`). Jump disabled. Barrack entry via trigger cube (`481246`) → forced push `maxX`. Trigger cube hidden. Shoji (`481245`): stairs-side only (`stairsSide: 'minZ'`), other 3 faces solid, doorway mesh ignore limited to door face (`doorDepth`), two-step height on `stairRun: 5` (10 → 11.25 → 12 → 12.75 inside). | Monument hide after audio (`481244`). Multi-door cube ID list. |
+| `shoji-v2` | Merged into `main` | commit `4831cd1` | Door-passage fix: no walk-through along stairs center aisle. | — |
 | `hide-trigger-cube` | Merged into `main` | commit `4b34f2b` | Hid trigger cube (`hideTriggerCube: true` + `object3D.visible = false`). | — |
 | `test-realm-shoji-interactions` | Older snapshot | commit `662388f` | Earlier known-good shoji + barrack work (before cube hide). | Kept for history. |
 
@@ -42,6 +42,21 @@ Then update this table.
 
 ---
 
+## Test checklist (`main`)
+
+Local preview: [http://localhost:8765/show/beyond-manzanar-space-33/](http://localhost:8765/show/beyond-manzanar-space-33/)  
+Hard refresh after script changes: `Cmd+Shift+R`
+
+| Feature | What to try |
+|---------|-------------|
+| Trigger cube | Should be **invisible**; still pushes you into the barrack |
+| Barrack walls | Can’t walk through walls |
+| Jump | Disabled |
+| Shoji stairs | Enter/exit only via stairs; 2 height steps |
+| Shoji interior | Walk straight into mesh after stairs → **blocked** |
+
+---
+
 ## Feature checklist (whole test kit)
 
 | Feature | Artwork | Branch that has a working version |
@@ -51,7 +66,7 @@ Then update this table.
 | Barrack entry (trigger cube) | `481246` | `main` |
 | Trigger cube hidden | `481246` | `main` |
 | Shoji stairs + walls | `481245` | `main` |
-| Shoji temple v2 | `481245` | `shoji-v2` (in progress) |
+| Shoji doorway mesh fix | `481245` | `main` (via `shoji-v2`) |
 | Audio end → hide monument | `481244` | *not done yet* |
 
 ---

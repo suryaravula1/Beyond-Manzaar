@@ -237,32 +237,59 @@ function isElevatedAtShoji() {
   return y > CONFIG.shoji.floorDefault + 0.35;
 }
 
-// Empty land LEFT/RIGHT of the stairs on the stairs face (parallel to stairs).
-// Does NOT affect left/right corridor length — only this stairs-face band.
-function isInBesideStairsZone(x, z, box) {
-  if (isInShojiDoorGap(x, z, box)) return false; // stair opening stays open (same as entry)
+// Stairs-face railing line (inset from mesh AABB so it matches the visual railing, not roof)
+function getStairsRailingCoord(box) {
+  const side = CONFIG.shoji.stairsSide;
+  // ~14% in from AABB face ≈ railing / deck edge
+  const insetX = (box.max.x - box.min.x) * 0.14;
+  const insetZ = (box.max.z - box.min.z) * 0.14;
+
+  if (side === 'minZ') return box.min.z + insetZ;
+  if (side === 'maxZ') return box.max.z - insetZ;
+  if (side === 'minX') return box.min.x + insetX;
+  return box.max.x - insetX;
+}
+
+// Past the stairs-face railing into empty land beside stairs (NOT the door/stair gap)
+function isPastStairsRailing(x, z, box) {
+  if (isInShojiDoorGap(x, z, box)) return false;
 
   const side = CONFIG.shoji.stairsSide;
-  const run = Math.max(CONFIG.shoji.stairRun, 2) + 1.5; // empty land outside stairs face
-  // How far into the temple from the stairs face the barrier reaches
-  const edgeIn = 2.2;
+  const rail = getStairsRailingCoord(box);
+  const run = Math.max(CONFIG.shoji.stairRun, 2) + 2;
+
+  if (side === 'minZ') return z < rail && z >= box.min.z - run;
+  if (side === 'maxZ') return z > rail && z <= box.max.z + run;
+  if (side === 'minX') return x < rail && x >= box.min.x - run;
+  return x > rail && x <= box.max.x + run;
+}
+
+// Crossed the stairs-face railing left/right of the opening (corridor → empty land)
+function crossedStairsRailingBesideGap(prevX, prevZ, x, z, box) {
+  if (isInShojiDoorGap(x, z, box) || isInShojiDoorGap(prevX, prevZ, box)) return false;
+
+  const side = CONFIG.shoji.stairsSide;
+  const rail = getStairsRailingCoord(box);
 
   if (side === 'minZ') {
-    return z >= box.min.z - run && z <= box.min.z + edgeIn;
+    return (prevZ >= rail && z < rail) || (prevZ > rail && z <= rail);
   }
   if (side === 'maxZ') {
-    return z <= box.max.z + run && z >= box.max.z - edgeIn;
+    return (prevZ <= rail && z > rail) || (prevZ < rail && z >= rail);
   }
   if (side === 'minX') {
-    return x >= box.min.x - run && x <= box.min.x + edgeIn;
+    return (prevX >= rail && x < rail) || (prevX > rail && x <= rail);
   }
-  return x <= box.max.x + run && x >= box.max.x - edgeIn;
+  return (prevX <= rail && x > rail) || (prevX < rail && x >= rail);
 }
 
 function resolveElevatedBesideStairs(prevX, prevZ, x, z, box) {
   if (!isElevatedAtShoji()) return null;
-  // Block only when moving into the beside-stairs empty strips
-  if (!isInBesideStairsZone(prevX, prevZ, box) && isInBesideStairsZone(x, z, box)) {
+
+  if (crossedStairsRailingBesideGap(prevX, prevZ, x, z, box)) {
+    return { x: prevX, z: prevZ };
+  }
+  if (!isPastStairsRailing(prevX, prevZ, box) && isPastStairsRailing(x, z, box)) {
     return { x: prevX, z: prevZ };
   }
   return null;
@@ -275,7 +302,7 @@ function clampElevatedBesideStairs() {
   const box = getShojiBox();
   if (!pos || !box || !isElevatedAtShoji()) return;
 
-  if (isInBesideStairsZone(pos.x, pos.z, box)) {
+  if (isPastStairsRailing(pos.x, pos.z, box)) {
     if (state.prevX != null && state.prevZ != null) {
       setPlayerXZ(state.prevX, state.prevZ);
     }
@@ -335,8 +362,8 @@ function enforceWallCollisions() {
       return;
     }
 
-    // Only change vs main: block elevated walk into empty land beside stairs
-    // (parallel to stairs). Does not change left/right corridor length.
+    // Only change vs main: stairs-face railing collision left/right of door gap
+    // (blocks elevated walk onto empty land beside stairs)
     const beside = resolveElevatedBesideStairs(
       state.prevX,
       state.prevZ,

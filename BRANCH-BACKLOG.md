@@ -15,9 +15,10 @@ After you commit, push with: `git push -u origin <branch-name>`
 | Goal | Command |
 |------|---------|
 | See current branch | `git branch` |
-| Restore this known-good shoji script | `git checkout test-realm-shoji-interactions` |
-| Start a new experiment | `git checkout -b <new-branch-name>` then add a row below |
+| Use stable code | `git checkout main` |
+| Start a new experiment | `git checkout main` then `git checkout -b <new-branch-name>` |
 | Save a script change | `git add beyond-manzanar-2026-07-31-6wErk78Y/custom-script.js` then `git commit` |
+| Push feature branch | `git push -u origin <branch-name>` |
 
 ---
 
@@ -25,18 +26,15 @@ After you commit, push with: `git push -u origin <branch-name>`
 
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
-| `test-realm-shoji-interactions` | **Known good — keep this** | commit `922796b` (HEAD) | Barrack wall collisions (`481241`). Jump disabled. Barrack entry via trigger cube (`481246`) → forced push `maxX`. Shoji (`481245`): stairs-side only (`stairsSide: 'minZ'`), other 3 faces solid, door gap `doorHalfWidth: 4`, two-step height on `stairRun: 5` (10 → 11.25 → 12 → 12.75 inside). | Monument hide after audio (`481244`). Multi-door cube ID list. Tune `stairsSide` if stairs are on another face. |
+| `main` | **Stable** | commit `4b34f2b` | Barrack wall collisions (`481241`). Jump disabled. Barrack entry via trigger cube (`481246`) → forced push `maxX`. Trigger cube hidden. Shoji (`481245`): stairs-side only (`stairsSide: 'minZ'`), other 3 faces solid, door gap `doorHalfWidth: 4`, two-step height on `stairRun: 5` (10 → 11.25 → 12 → 12.75 inside). | Monument hide after audio (`481244`). Multi-door cube ID list. |
+| `shoji-v2` | **In progress** | branched from `main` @ `4b34f2b` | Same as `main` for now — next shoji temple changes go here. | Shoji temple v2 adjustments (to be defined). |
+| `hide-trigger-cube` | Merged into `main` | commit `4b34f2b` | Hid trigger cube (`hideTriggerCube: true` + `object3D.visible = false`). | — |
+| `test-realm-shoji-interactions` | Older snapshot | commit `662388f` | Earlier known-good shoji + barrack work (before cube hide). | Kept for history. |
 
-### Template for the next branch
-
-| Branch | Status | Script snapshot | What this code does | Still open on this branch |
-|--------|--------|-----------------|---------------------|---------------------------|
-| `<branch-name>` | in progress | copy from `test-realm-shoji-interactions` first | … | … |
-
-Start every new branch from the known-good one:
+Start every new branch from `main`:
 
 ```bash
-git checkout test-realm-shoji-interactions
+git checkout main
 git checkout -b <new-branch-name>
 ```
 
@@ -48,10 +46,12 @@ Then update this table.
 
 | Feature | Artwork | Branch that has a working version |
 |---------|---------|-----------------------------------|
-| Barrack wall collisions | `481241` | `test-realm-shoji-interactions` |
-| Jump disabled | — | `test-realm-shoji-interactions` |
-| Barrack entry (trigger cube) | `481246` | `test-realm-shoji-interactions` |
-| Shoji stairs + walls | `481245` | `test-realm-shoji-interactions` |
+| Barrack wall collisions | `481241` | `main` |
+| Jump disabled | — | `main` |
+| Barrack entry (trigger cube) | `481246` | `main` |
+| Trigger cube hidden | `481246` | `main` |
+| Shoji stairs + walls | `481245` | `main` |
+| Shoji temple v2 | `481245` | `shoji-v2` (in progress) |
 | Audio end → hide monument | `481244` | *not done yet* |
 
 ---

@@ -230,6 +230,54 @@ function isInShojiDoorPassage(x, z, box) {
   return isInShojiDoorGap(x, z, box) && isNearShojiDoorFace(x, z, box);
 }
 
+// Deck ≈ inside the railing (mesh AABB is larger because of roof eaves)
+function isOnShojiDeck(x, z, box) {
+  const frac = 0.14;
+  const sx = (box.max.x - box.min.x) * frac;
+  const sz = (box.max.z - box.min.z) * frac;
+  return (
+    x >= box.min.x + sx &&
+    x <= box.max.x - sx &&
+    z >= box.min.z + sz &&
+    z <= box.max.z - sz
+  );
+}
+
+function isElevatedAtShoji() {
+  const ms = window.controls;
+  const y = ms && ms.floorLevel != null ? ms.floorLevel : null;
+  if (y == null) return false;
+  return y > CONFIG.shoji.floorDefault + 0.35;
+}
+
+// Elevated walk allowed on deck OR in door/stair gap (same width as entry).
+// Blocks corridor → empty land beside stairs (parallel to stairs).
+function isAllowedElevatedShojiXZ(x, z, box) {
+  return isOnShojiDeck(x, z, box) || isInShojiDoorGap(x, z, box);
+}
+
+function resolveElevatedBesideStairs(prevX, prevZ, x, z, box) {
+  if (!isElevatedAtShoji()) return null;
+  const wasOk = isAllowedElevatedShojiXZ(prevX, prevZ, box);
+  const nowOk = isAllowedElevatedShojiXZ(x, z, box);
+  if (wasOk && !nowOk) return { x: prevX, z: prevZ };
+  return null;
+}
+
+function clampElevatedBesideStairs() {
+  if (state.cameraAnimating || isEditing()) return;
+
+  const pos = getPlayerWorld();
+  const box = getShojiBox();
+  if (!pos || !box || !isElevatedAtShoji()) return;
+
+  if (!isAllowedElevatedShojiXZ(pos.x, pos.z, box)) {
+    if (state.prevX != null && state.prevZ != null) {
+      setPlayerXZ(state.prevX, state.prevZ);
+    }
+  }
+}
+
 // Solid footprint walls on all faces except the stairs door gap
 function resolveShojiFootprint(prevX, prevZ, x, z, box) {
   const wasInside = isInsideBoxXZ({ x: prevX, z: prevZ }, box, 0);
@@ -280,6 +328,19 @@ function enforceWallCollisions() {
     const blocked = resolveShojiFootprint(state.prevX, state.prevZ, pos.x, pos.z, shojiBox);
     if (blocked) {
       setPlayerXZ(blocked.x, blocked.z);
+      return;
+    }
+
+    // Only change vs main: block elevated walk off corridor onto land beside stairs
+    const beside = resolveElevatedBesideStairs(
+      state.prevX,
+      state.prevZ,
+      pos.x,
+      pos.z,
+      shojiBox
+    );
+    if (beside) {
+      setPlayerXZ(beside.x, beside.z);
       return;
     }
   }
@@ -631,6 +692,7 @@ space.onFrame = () => {
   if (!state.proximityWired) setupProximityEntry();
   checkProximityEntry();
   applyShojiSteps();
+  clampElevatedBesideStairs();
   enforceWallCollisions();
   blockJump();
 };

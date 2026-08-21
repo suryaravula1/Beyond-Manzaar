@@ -5,8 +5,12 @@
 // Notes: Usefull Notes.txt
 
 const BARRACK_ID = 481241;
+const MONUMENT_ID = 481244;
 const SHOJI_ID = 481245;
 const TRIGGER_CUBE_ID = 481246;
+// Optional: paste audio artwork ID from NAC Catalog/Inspect.
+// If null, script finds documentsRecentlyDiscovered* by filename.
+const VOICE_AUDIO_ID = null;
 
 const CONFIG = {
   lookAhead: 2.5,
@@ -23,6 +27,11 @@ const CONFIG = {
   hideTriggerCube: true,
   oneWay: false,
   debugEntry: false,
+
+  // Monument voice → hide monument when audio ends (~26s)
+  voiceFileMatch: 'documentsrecentlydiscovered',
+  voiceFallbackHideMs: 26000, // if 'ended' never fires
+  voiceMaxAudibleRadius: 900000,
 
   // Shoji temple — step up + wall collisions (tune in Preview)
   // Heights are ~half the first pass (relative to floorDefault).
@@ -48,11 +57,15 @@ const state = {
   barrack: null,
   shoji: null,
   trigger: null,
+  monument: null,
+  voice: null,
   raycaster: null,
   groundY: null,
   hasEntered: false,
   cameraAnimating: false,
   proximityWired: false,
+  voiceWired: false,
+  monumentHidden: false,
   mustLeaveCube: false,
   entryDebugAt: 0,
 };
@@ -113,6 +126,85 @@ function getShoji() {
 
 function getTrigger() {
   return getArtwork(TRIGGER_CUBE_ID, 'trigger');
+}
+
+function getMonument() {
+  return getArtwork(MONUMENT_ID, 'monument');
+}
+
+function artworkName(artwork) {
+  if (!artwork) return '';
+  return String(
+    artwork.fileName || artwork.prettyFileName || artwork.title || artwork.name || ''
+  ).toLowerCase();
+}
+
+function findVoiceArtwork() {
+  if (VOICE_AUDIO_ID != null) {
+    return nac.getArtworkById(VOICE_AUDIO_ID);
+  }
+  if (typeof nac.getArtworks !== 'function') return null;
+  const all = nac.getArtworks() || {};
+  const list = Array.isArray(all) ? all : Object.values(all);
+  return (
+    list.find(function (a) {
+      return artworkName(a).indexOf(CONFIG.voiceFileMatch) !== -1;
+    }) || null
+  );
+}
+
+function setMonumentVisible(visible) {
+  const monument = getMonument();
+  if (!monument) {
+    console.warn('[BM] monument not found:', MONUMENT_ID);
+    return;
+  }
+  try {
+    nac.setArtworkOpacity(monument, visible ? 1 : 0);
+  } catch (e) {
+    if (monument.object3D) monument.object3D.visible = !!visible;
+  }
+  state.monumentHidden = !visible;
+  console.log('[BM] monument visible =', visible);
+}
+
+function hideMonumentAfterAudio() {
+  if (state.monumentHidden) return;
+  setMonumentVisible(false);
+}
+
+function wireMonumentAudio() {
+  if (state.voiceWired || isEditing()) return;
+
+  const voice = findVoiceArtwork();
+  if (!voice || !voice.element) return;
+
+  state.voice = voice;
+  state.voiceWired = true;
+  voice.playAutomatically = false;
+  voice.maxAudibleRadius = CONFIG.voiceMaxAudibleRadius;
+
+  voice.element.addEventListener('ended', function () {
+    hideMonumentAfterAudio();
+  });
+
+  if (typeof nac.setOnFirstInteraction === 'function') {
+    nac.setOnFirstInteraction(function () {
+      try {
+        nac.playAudioOnce(voice);
+        console.log('[BM] playing documentsRecentlyDiscovered voice, id =', voice.id);
+        // Fallback if ended never fires (some NAC audio setups)
+        window.setTimeout(hideMonumentAfterAudio, CONFIG.voiceFallbackHideMs);
+      } catch (err) {
+        console.warn('[BM] playAudioOnce failed', err);
+        window.setTimeout(hideMonumentAfterAudio, CONFIG.voiceFallbackHideMs);
+      }
+    });
+  } else {
+    console.warn('[BM] setOnFirstInteraction missing; voice will not auto-start');
+  }
+
+  console.log('[BM] wired voice artwork id =', voice.id);
 }
 
 function getMeshBox(artwork) {
@@ -718,10 +810,12 @@ space.beforeInit = () => {
 space.afterInit = () => {
   if (CONFIG.disableJump) disableJumpAtSource();
   setupProximityEntry();
+  wireMonumentAudio();
 };
 
 space.onFrame = () => {
   if (!state.proximityWired) setupProximityEntry();
+  if (!state.voiceWired) wireMonumentAudio();
   checkProximityEntry();
   applyShojiSteps();
   clampElevatedBesideStairs();

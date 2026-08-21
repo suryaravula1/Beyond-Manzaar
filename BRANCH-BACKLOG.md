@@ -26,7 +26,8 @@ After you commit, push with: `git push -u origin <branch-name>`
 
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
-| `main` | **Stable** | (after shoji-v3 merge) | Barrack + jump + hidden cube + shoji stairs/walls + stairs-face railing beside door gap. | Monument hide after audio (`481244`). Multi-door cube ID list. |
+| `main` | **Stable** | (after shoji-v3 merge) | Barrack + jump + hidden cube + shoji stairs/walls + stairs-face railing beside door gap. | Multi-door cube ID list. |
+| `audio-monument` | **In progress** | this branch | Play `documentsRecentlyDiscovered` voice on first click; when it ends (~26s), hide monument (`481244`). | Confirm voice artwork ID in live NAC if auto-detect fails. |
 | `shoji-v3` | Merged into `main` | commit `2157775` | Stairs-face railing collision left/right of door gap — blocks elevated walk onto empty land beside stairs. | — |
 | `shoji-v2` | Merged into `main` | commit `4831cd1` | Door-passage fix: no walk-through along stairs center aisle. | — |
 | `hide-trigger-cube` | Merged into `main` | commit `4b34f2b` | Hid trigger cube (`hideTriggerCube: true` + `object3D.visible = false`). | — |
@@ -56,6 +57,7 @@ Hard refresh after script changes: `Cmd+Shift+R`
 | Shoji stairs | Enter/exit only via stairs; 2 height steps |
 | Shoji beside stairs | From corridor, cannot walk past stairs-face railing onto empty land |
 | Shoji interior | Walk straight into mesh after stairs → **blocked** |
+| Monument audio | First click plays voice; when it ends (~26s), monument disappears |
 
 ---
 
@@ -69,7 +71,7 @@ Hard refresh after script changes: `Cmd+Shift+R`
 | Trigger cube hidden | `481246` | `main` |
 | Shoji stairs + walls | `481245` | `main` |
 | Shoji doorway mesh fix | `481245` | `main` (via `shoji-v2`) |
-| Audio end → hide monument | `481244` | *not done yet* |
+| Audio end → hide monument | `481244` | `audio-monument` (in progress) |
 
 ---
 
@@ -81,3 +83,4 @@ Hard refresh after script changes: `Cmd+Shift+R`
 | 481244 | fading_monument |
 | 481245 | shoji |
 | 481246 | triggerCube (barrack entry) |
+| *(Inspect)* | `documentsRecentlyDiscovered_22kH8m-g2.wav` — set `VOICE_AUDIO_ID` if auto-find fails |

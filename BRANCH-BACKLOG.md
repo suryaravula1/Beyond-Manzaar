@@ -15,9 +15,10 @@ After you commit, push with: `git push -u origin <branch-name>`
 | Goal | Command |
 |------|---------|
 | See current branch | `git branch` |
-| Restore this known-good shoji script | `git checkout test-realm-shoji-interactions` |
-| Start a new experiment | `git checkout -b <new-branch-name>` then add a row below |
+| Use stable code | `git checkout main` |
+| Start a new experiment | `git checkout main` then `git checkout -b <new-branch-name>` |
 | Save a script change | `git add beyond-manzanar-2026-07-31-6wErk78Y/custom-script.js` then `git commit` |
+| Push feature branch | `git push -u origin <branch-name>` |
 
 ---
 
@@ -25,18 +26,16 @@ After you commit, push with: `git push -u origin <branch-name>`
 
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
-| `test-realm-shoji-interactions` | **Known good — keep this** | commit `922796b` (HEAD) | Barrack wall collisions (`481241`). Jump disabled. Barrack entry via trigger cube (`481246`) → forced push `maxX`. Shoji (`481245`): stairs-side only (`stairsSide: 'minZ'`), other 3 faces solid, door gap `doorHalfWidth: 4`, two-step height on `stairRun: 5` (10 → 11.25 → 12 → 12.75 inside). | Monument hide after audio (`481244`). Multi-door cube ID list. Tune `stairsSide` if stairs are on another face. |
+| `main` | **Stable** | (after shoji-v3 merge) | Barrack + jump + hidden cube + shoji stairs/walls + stairs-face railing beside door gap. | Monument hide after audio (`481244`). Multi-door cube ID list. |
+| `shoji-v3` | Merged into `main` | commit `2157775` | Stairs-face railing collision left/right of door gap — blocks elevated walk onto empty land beside stairs. | — |
+| `shoji-v2` | Merged into `main` | commit `4831cd1` | Door-passage fix: no walk-through along stairs center aisle. | — |
+| `hide-trigger-cube` | Merged into `main` | commit `4b34f2b` | Hid trigger cube (`hideTriggerCube: true` + `object3D.visible = false`). | — |
+| `test-realm-shoji-interactions` | Older snapshot | commit `662388f` | Earlier known-good shoji + barrack work (before cube hide). | Kept for history. |
 
-### Template for the next branch
-
-| Branch | Status | Script snapshot | What this code does | Still open on this branch |
-|--------|--------|-----------------|---------------------|---------------------------|
-| `<branch-name>` | in progress | copy from `test-realm-shoji-interactions` first | … | … |
-
-Start every new branch from the known-good one:
+Start every new branch from `main`:
 
 ```bash
-git checkout test-realm-shoji-interactions
+git checkout main
 git checkout -b <new-branch-name>
 ```
 
@@ -44,14 +43,32 @@ Then update this table.
 
 ---
 
+## Test checklist (`main`)
+
+Local preview: [http://localhost:8765/show/beyond-manzanar-space-33/](http://localhost:8765/show/beyond-manzanar-space-33/)  
+Hard refresh after script changes: `Cmd+Shift+R`
+
+| Feature | What to try |
+|---------|-------------|
+| Trigger cube | Should be **invisible**; still pushes you into the barrack |
+| Barrack walls | Can’t walk through walls |
+| Jump | Disabled |
+| Shoji stairs | Enter/exit only via stairs; 2 height steps |
+| Shoji beside stairs | From corridor, cannot walk past stairs-face railing onto empty land |
+| Shoji interior | Walk straight into mesh after stairs → **blocked** |
+
+---
+
 ## Feature checklist (whole test kit)
 
 | Feature | Artwork | Branch that has a working version |
 |---------|---------|-----------------------------------|
-| Barrack wall collisions | `481241` | `test-realm-shoji-interactions` |
-| Jump disabled | — | `test-realm-shoji-interactions` |
-| Barrack entry (trigger cube) | `481246` | `test-realm-shoji-interactions` |
-| Shoji stairs + walls | `481245` | `test-realm-shoji-interactions` |
+| Barrack wall collisions | `481241` | `main` |
+| Jump disabled | — | `main` |
+| Barrack entry (trigger cube) | `481246` | `main` |
+| Trigger cube hidden | `481246` | `main` |
+| Shoji stairs + walls | `481245` | `main` |
+| Shoji doorway mesh fix | `481245` | `main` (via `shoji-v2`) |
 | Audio end → hide monument | `481244` | *not done yet* |
 
 ---

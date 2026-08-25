@@ -23,6 +23,8 @@ const CONFIG = {
   hideTriggerCube: true,
   oneWay: false,
   debugEntry: false,
+  // Set true to log [BM height] ~2×/sec in browser console
+  debugHeight: false,
 
   // Shoji temple — step up + wall collisions (tune in Preview)
   // Heights are ~half the first pass (relative to floorDefault).
@@ -55,6 +57,7 @@ const state = {
   proximityWired: false,
   mustLeaveCube: false,
   entryDebugAt: 0,
+  heightDebugAt: 0,
 };
 
 function isEditing() {
@@ -296,7 +299,8 @@ function resolveElevatedBesideStairs(prevX, prevZ, x, z, box) {
 }
 
 function clampElevatedBesideStairs() {
-  if (state.cameraAnimating || isEditing()) return;
+  // Allow in edit-3d — NAC Preview as editor often stays in that mode
+  if (state.cameraAnimating) return;
 
   const pos = getPlayerWorld();
   const box = getShojiBox();
@@ -482,24 +486,61 @@ function getShojiStepFloor(pos, box) {
 }
 
 function applyShojiSteps() {
-  if (isEditing() || state.cameraAnimating) return;
+  // Do NOT skip when mode is edit-3d — NAC Preview as editor often stays in
+  // edit-3d, which previously blocked stairs while walls still worked.
+  if (state.cameraAnimating) return;
 
   const pos = getPlayerWorld();
   const box = getShojiBox();
-  if (!pos || !box) return;
+  if (!pos || !box) {
+    if (CONFIG.debugHeight && performance.now() - state.heightDebugAt > 500) {
+      state.heightDebugAt = performance.now();
+      console.warn('[BM height]', {
+        mode: typeof mode !== 'undefined' ? String(mode) : '(none)',
+        isEditing: isEditing(),
+        hasPos: !!pos,
+        hasShojiBox: !!box,
+        shojiId: SHOJI_ID,
+      });
+    }
+    return;
+  }
 
   let target = CONFIG.shoji.floorDefault;
+  const inside = isInsideBoxXZ(pos, box, 0);
+  const onStairs = isOnStairsApproach(pos, box);
 
   // Height changes only on the stairs corridor / inside — not from other sides
-  if (isInsideBoxXZ(pos, box, 0) || isOnStairsApproach(pos, box)) {
-    if (isInsideBoxXZ(pos, box, 0)) {
+  if (inside || onStairs) {
+    if (inside) {
       target = getShojiStepFloor(pos, box);
-    } else if (isOnStairsApproach(pos, box)) {
+    } else if (onStairs) {
       target = floorFromStairProgress(getStairProgress(pos, box));
     }
   }
 
   setPlayerFloor(target);
+
+  if (CONFIG.debugHeight && performance.now() - state.heightDebugAt > 500) {
+    state.heightDebugAt = performance.now();
+    const ms = window.controls;
+    const mover = getMover();
+    console.log('[BM height]', {
+      mode: typeof mode !== 'undefined' ? String(mode) : '(none)',
+      isEditing: isEditing(),
+      inside: inside,
+      onStairs: onStairs,
+      stairT: onStairs || inside ? getStairProgress(pos, box) : null,
+      targetY: target,
+      msFloor: ms ? ms.floorLevel : null,
+      moverY: mover ? mover.position.y : null,
+      camY: pos.y,
+      x: pos.x.toFixed(1),
+      z: pos.z.toFixed(1),
+      boxMinZ: box.min.z.toFixed(1),
+      boxMaxZ: box.max.z.toFixed(1),
+    });
+  }
 }
 
 // --- Jump disabled ---

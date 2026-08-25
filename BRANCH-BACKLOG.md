@@ -26,7 +26,9 @@ After you commit, push with: `git push -u origin <branch-name>`
 
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
-| `main` | **Stable** | (after shoji-v3 merge) | Barrack + jump + hidden cube + shoji stairs/walls + stairs-face railing beside door gap. | Monument hide after audio (`481244`). Multi-door cube ID list. |
+| `main` | **Stable** | (after shoji-v3 merge) | Barrack + jump + hidden cube + shoji stairs/walls + stairs-face railing beside door gap. | Multi-door cube ID list. |
+| `shoji-height` | **In progress** | this branch | Fix shoji stair height in NAC Preview: steps no longer skip when `mode` is `edit-3d`. | Merge after confirm. |
+| `audio-monument` | **In progress** | commit `21b17ee` | Play `documentsRecentlyDiscovered` voice; hide monument (`481244`) when it ends. | Rebase onto main after `shoji-height` merges. |
 | `shoji-v3` | Merged into `main` | commit `2157775` | Stairs-face railing collision left/right of door gap — blocks elevated walk onto empty land beside stairs. | — |
 | `shoji-v2` | Merged into `main` | commit `4831cd1` | Door-passage fix: no walk-through along stairs center aisle. | — |
 | `hide-trigger-cube` | Merged into `main` | commit `4b34f2b` | Hid trigger cube (`hideTriggerCube: true` + `object3D.visible = false`). | — |
@@ -69,7 +71,8 @@ Hard refresh after script changes: `Cmd+Shift+R`
 | Trigger cube hidden | `481246` | `main` |
 | Shoji stairs + walls | `481245` | `main` |
 | Shoji doorway mesh fix | `481245` | `main` (via `shoji-v2`) |
-| Audio end → hide monument | `481244` | *not done yet* |
+| Shoji height in NAC edit-3d Preview | `481245` | `shoji-height` |
+| Audio end → hide monument | `481244` | `audio-monument` (in progress) |
 
 ---
 

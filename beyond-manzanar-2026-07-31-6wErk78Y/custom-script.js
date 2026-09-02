@@ -4,7 +4,8 @@
 // Beyond Manzanar Test Realm
 // Notes: Usefull Notes.txt
 
-const BARRACK_ID = 481241;
+const BARRACK_OPEN_ID = 481241;
+const BARRACK_CLOSED_ID = 481790;
 const SHOJI_ID = 481245;
 const TRIGGER_CUBE_ID = 481246;
 
@@ -12,6 +13,10 @@ const CONFIG = {
   lookAhead: 2.5,
   rayHeightOffset: -2,
   disableJump: true,
+
+  // Barrack doors: start closed → open after delay → seal closed after entry
+  barrackOpenDelayMs: 3000,
+  sealBarrackOnEnter: true,
 
   // Barrack entry cube
   entryDestSide: 'maxX',
@@ -21,10 +26,12 @@ const CONFIG = {
   walkSpeed: 1,
   lockedSpeed: 0,
   hideTriggerCube: true,
-  oneWay: false,
+  oneWay: true, // after enter + seal, do not re-trigger entry
   debugEntry: false,
   // Set true to log [BM height] ~2×/sec in browser console
   debugHeight: false,
+  // Logs every artwork id/name once on load — needed to wire new Scene 1 assets
+  logArtworkInventory: true,
 
   // Shoji temple — step up + wall collisions (tune in Preview)
   // Heights are ~half the first pass (relative to floorDefault).
@@ -47,7 +54,8 @@ const CONFIG = {
 const state = {
   prevX: null,
   prevZ: null,
-  barrack: null,
+  barrackOpen: null,
+  barrackClosed: null,
   shoji: null,
   trigger: null,
   raycaster: null,
@@ -58,6 +66,10 @@ const state = {
   mustLeaveCube: false,
   entryDebugAt: 0,
   heightDebugAt: 0,
+  fogCleared: false,
+  // 'closed' (start) | 'open' (after delay) | 'sealed' (after player enters)
+  barrackDoorPhase: 'closed',
+  barrackOpenScheduled: false,
 };
 
 function isEditing() {
@@ -106,8 +118,81 @@ function getArtwork(id, cacheKey) {
   return state[cacheKey];
 }
 
+// Lists every artwork in the space so new assets can be wired without Inspect
+function dumpArtworkInventory() {
+  if (typeof nac.getArtworks !== 'function') {
+    console.warn('[BM inventory] nac.getArtworks unavailable');
+    return;
+  }
+  const all = nac.getArtworks() || {};
+  const list = Array.isArray(all) ? all : Object.values(all);
+  const rows = list.map(function (a) {
+    return {
+      id: a.id,
+      type: a.type,
+      name: a.title || a.prettyFileName || a.fileName || '(untitled)',
+      file: a.fileName || '',
+      hasAudioEl: !!a.element,
+    };
+  });
+  console.log('[BM inventory] ' + rows.length + ' artworks');
+  if (typeof console.table === 'function') console.table(rows);
+  else console.log(rows);
+  // Paste-friendly copy for sharing
+  console.log('[BM inventory json] ' + JSON.stringify(rows));
+}
+
+function getBarrackOpen() {
+  return getArtwork(BARRACK_OPEN_ID, 'barrackOpen');
+}
+
+function getBarrackClosed() {
+  return getArtwork(BARRACK_CLOSED_ID, 'barrackClosed');
+}
+
+// Collision mesh follows door phase: open mesh while doors open; closed mesh otherwise
 function getBarrack() {
-  return getArtwork(BARRACK_ID, 'barrack');
+  if (state.barrackDoorPhase === 'open') return getBarrackOpen();
+  return getBarrackClosed();
+}
+
+function setArtworkShown(artwork, shown) {
+  if (!artwork) return;
+  try {
+    nac.setArtworkOpacity(artwork, shown ? 1 : 0);
+  } catch (e) {}
+  if (artwork.object3D) artwork.object3D.visible = !!shown;
+}
+
+function applyBarrackDoorVisuals() {
+  const phase = state.barrackDoorPhase;
+  // Sealed: keep open visible so interior photos/items stay; closed stays for the shut door
+  const showOpen = phase === 'open' || phase === 'sealed';
+  const showClosed = phase === 'closed' || phase === 'sealed';
+  setArtworkShown(getBarrackOpen(), showOpen);
+  setArtworkShown(getBarrackClosed(), showClosed);
+  console.log('[BM] barrack doors →', phase, { showOpen: showOpen, showClosed: showClosed });
+}
+
+function scheduleBarrackOpen() {
+  if (state.barrackOpenScheduled) return;
+  state.barrackOpenScheduled = true;
+  window.setTimeout(function () {
+    if (state.barrackDoorPhase !== 'closed') return;
+    state.barrackDoorPhase = 'open';
+    applyBarrackDoorVisuals();
+  }, CONFIG.barrackOpenDelayMs);
+}
+
+function sealBarrackDoors() {
+  if (!CONFIG.sealBarrackOnEnter) return;
+  if (state.barrackDoorPhase === 'sealed') return;
+  state.barrackDoorPhase = 'sealed';
+  applyBarrackDoorVisuals();
+}
+
+function canEnterBarrack() {
+  return state.barrackDoorPhase === 'open';
 }
 
 function getShoji() {
@@ -349,7 +434,9 @@ function enforceWallCollisions() {
 
   const pos = getPlayerWorld();
   if (!pos) return;
-  if (nearTriggerCube(pos)) return;
+  // Only ignore walls near the door trigger while doors are OPEN (so entry push works).
+  // When sealed/closed, keep collisions so the closed door can block exit/entry.
+  if (state.barrackDoorPhase === 'open' && nearTriggerCube(pos)) return;
 
   if (state.prevX == null || state.prevZ == null) {
     state.prevX = pos.x;
@@ -378,6 +465,23 @@ function enforceWallCollisions() {
     if (beside) {
       setPlayerXZ(beside.x, beside.z);
       return;
+    }
+  }
+
+  // When doors are sealed/closed: solid barrack footprint (no door gap) — blocks walking out
+  if (state.barrackDoorPhase !== 'open') {
+    const closedBox = getMeshBox(getBarrackClosed());
+    if (closedBox) {
+      const wasInside = isInsideBoxXZ(
+        { x: state.prevX, z: state.prevZ },
+        closedBox,
+        0
+      );
+      const nowInside = isInsideBoxXZ(pos, closedBox, 0);
+      if (wasInside !== nowInside) {
+        setPlayerXZ(state.prevX, state.prevZ);
+        return;
+      }
     }
   }
 
@@ -654,6 +758,7 @@ function getInsideFaceWorldDest(playerPos) {
 
 function startForcedPush() {
   if (state.cameraAnimating) return;
+  if (!canEnterBarrack()) return;
   if (CONFIG.oneWay && state.hasEntered) return;
 
   state.cameraAnimating = true;
@@ -683,6 +788,7 @@ function startForcedPush() {
     unlockNavigation();
     state.hasEntered = true;
     state.mustLeaveCube = true;
+    sealBarrackDoors();
     return;
   }
 
@@ -702,6 +808,7 @@ function startForcedPush() {
       unlockNavigation();
       state.hasEntered = true;
       state.mustLeaveCube = true;
+      sealBarrackDoors();
       if (window.desktopControls) window.desktopControls.enabled = true;
       if (typeof nac.setMovementSpeed === 'function') {
         nac.setMovementSpeed(CONFIG.walkSpeed);
@@ -730,39 +837,76 @@ function checkProximityEntry() {
   if (inZone) startForcedPush();
 }
 
+function hideTriggerCubeVisual() {
+  if (!CONFIG.hideTriggerCube) return;
+  const trigger = getTrigger();
+  if (!trigger) return;
+  try {
+    nac.setArtworkOpacity(trigger, 0);
+  } catch (e) {}
+  if (trigger.object3D) {
+    trigger.object3D.visible = false;
+    trigger.object3D.traverse(function (child) {
+      if (child.isMesh) child.visible = false;
+    });
+  }
+}
+
 function setupProximityEntry() {
   if (state.proximityWired) return;
   const trigger = getTrigger();
   if (!trigger) return;
 
-  //state.proximityWired = true;
   state.proximityWired = true;
-try {
-  nac.setArtworkOpacity(trigger, CONFIG.hideTriggerCube ? 0 : 1);
-} catch (e) {}
+  hideTriggerCubeVisual();
+  if (typeof nac.onUserAvatarEntersArtworkRadius === 'function') {
+    nac.onUserAvatarEntersArtworkRadius(trigger, CONFIG.triggerRadius, function () {
+      if (!canEnterBarrack()) return;
+      startForcedPush();
+    });
+  }
+}
 
-if (CONFIG.hideTriggerCube && trigger.object3D) {
-  trigger.object3D.visible = false;
-}
-if (typeof nac.onUserAvatarEntersArtworkRadius === 'function') {
-  nac.onUserAvatarEntersArtworkRadius(trigger, CONFIG.triggerRadius, function () {
-    startForcedPush();
-  });
-}
+function clearFogAndExtendCamera() {
+  const far = 5000;
+  try {
+    if (typeof nac.disableFog === 'function') nac.disableFog();
+  } catch (e) {}
+  // Tunnel sideload runs after fog already exists — flag alone is not enough
+  if (window.scene) window.scene.fog = null;
+  try {
+    if (typeof nac.setCameraFar === 'function') nac.setCameraFar(far);
+  } catch (e) {}
+  // setCameraFar only writes settings; force the live camera clip plane
+  const cam = window.camera;
+  if (cam) {
+    cam.far = far;
+    if (typeof cam.updateProjectionMatrix === 'function') cam.updateProjectionMatrix();
+  }
 }
 
 space.beforeInit = () => {
-  nac.disableFog();
-  nac.setCameraFar(5000);
+  clearFogAndExtendCamera();
 };
 
 space.afterInit = () => {
+  clearFogAndExtendCamera();
+  if (CONFIG.logArtworkInventory) dumpArtworkInventory();
   if (CONFIG.disableJump) disableJumpAtSource();
+  state.barrackDoorPhase = 'closed';
+  applyBarrackDoorVisuals();
+  scheduleBarrackOpen();
   setupProximityEntry();
 };
 
 space.onFrame = () => {
+  // NAC may recreate fog after late load; clear until it sticks
+  if (!state.fogCleared || (window.scene && window.scene.fog)) {
+    clearFogAndExtendCamera();
+    if (!window.scene || !window.scene.fog) state.fogCleared = true;
+  }
   if (!state.proximityWired) setupProximityEntry();
+  hideTriggerCubeVisual();
   checkProximityEntry();
   applyShojiSteps();
   clampElevatedBesideStairs();

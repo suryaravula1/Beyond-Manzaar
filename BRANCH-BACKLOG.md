@@ -27,7 +27,9 @@ After you commit, push with: `git push -u origin <branch-name>`
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
 | `main` | **Stable** | (after shoji-v3 merge) | Barrack + jump + hidden cube + shoji stairs/walls + stairs-face railing beside door gap. | Multi-door cube ID list. |
-| `shoji-height` | **In progress** | this branch | Fix shoji stair height in NAC Preview: steps no longer skip when `mode` is `edit-3d`. | Merge after confirm. |
+| `scene1-desert` | **In progress** | this branch | Scene 1 opening from the VRML: wind + gong, monument body fades at t+4s over 6s, azan at t+6s, azan end → camp fades in → sky barrier → doors open + shoji on. Monument calligraphy holds until the radio broadcast ends. Assets resolve by filename, so new uploads need no IDs. Lives in `beyond-manzanar-2026-09-02-NBsEyGgC/custom-script.js`. | Needs gong/azan/wind audio uploaded; confirm ground + pano handling. |
+| `barrack-doors` | **In progress** | this branch | Barracks start closed → open after 3s → seal closed after entry; collisions use closed mesh so you can’t walk back out. Includes shoji-height + fog/camera far fixes for tunnel. | Confirm in NAC; more barrack pairs later. |
+| `shoji-height` | **In progress** | commit `a400f7f` | Fix shoji stair height in NAC Preview: steps no longer skip when `mode` is `edit-3d`. | Merge after confirm. |
 | `audio-monument` | **In progress** | commit `21b17ee` | Play `documentsRecentlyDiscovered` voice; hide monument (`481244`) when it ends. | Rebase onto main after `shoji-height` merges. |
 | `shoji-v3` | Merged into `main` | commit `2157775` | Stairs-face railing collision left/right of door gap — blocks elevated walk onto empty land beside stairs. | — |
 | `shoji-v2` | Merged into `main` | commit `4831cd1` | Door-passage fix: no walk-through along stairs center aisle. | — |
@@ -81,6 +83,7 @@ Hard refresh after script changes: `Cmd+Shift+R`
 | ID | Asset |
 |----|--------|
 | 481241 | barrack_block_open |
+| 481790 | barrack_block_closed (stacked on open) |
 | 481244 | fading_monument |
 | 481245 | shoji |
 | 481246 | triggerCube (barrack entry) |

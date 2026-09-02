@@ -251,6 +251,35 @@ function dumpArtworkInventory() {
   console.log('[BM inventory json] ' + JSON.stringify(rows));
 }
 
+// Answers "what still needs placing in the space?" in one table
+function dumpAssetResolution() {
+  const keys = Object.keys(ASSET_NAMES);
+  const rows = [];
+  const missing = [];
+
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const art = getAsset(key);
+    if (!art) missing.push(key);
+    rows.push({
+      asset: key,
+      found: !!art,
+      id: art ? art.id : '',
+      file: art ? art.fileName || art.prettyFileName || '' : '',
+      audio: art ? !!art.element : '',
+    });
+  }
+
+  if (typeof console.table === 'function') console.table(rows);
+  else console.log(rows);
+
+  if (missing.length) {
+    console.warn('[BM assets] MISSING (' + missing.length + '): ' + missing.join(', '));
+  } else {
+    console.log('[BM assets] all assets resolved');
+  }
+}
+
 function getBarrackOpen() {
   return getAsset('barrackOpen');
 }
@@ -1266,7 +1295,10 @@ space.beforeInit = () => {
 
 space.afterInit = () => {
   clearFogAndExtendCamera();
-  if (CONFIG.logArtworkInventory) dumpArtworkInventory();
+  if (CONFIG.logArtworkInventory) {
+    dumpArtworkInventory();
+    dumpAssetResolution();
+  }
   if (CONFIG.disableJump) disableJumpAtSource();
   state.barrackDoorPhase = 'closed';
   if (CONFIG.scene1.enabled) {

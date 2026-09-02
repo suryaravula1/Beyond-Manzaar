@@ -2,8 +2,12 @@
 
 **Remote:** [https://github.com/suryaravula1/Beyond-Manzaar](https://github.com/suryaravula1/Beyond-Manzaar)
 
-Git tracks **only** `beyond-manzanar-2026-07-31-6wErk78Y/custom-script.js` (plus this file).
+Git tracks **only** `beyond-manzanar-2026-09-02-sl5oKWTD/custom-script.js` (plus this file).
 Paste that script into the NAC Script Editor for Test Realm.
+
+The older `beyond-manzanar-2026-07-31-6wErk78Y` export has been deleted. Branches
+before `scene1-desert` still track their script at that old path, so checking one
+out recreates the folder with just that one file.
 
 When you create a new branch, add a row here before you start changing the script.
 After you commit, push with: `git push -u origin <branch-name>`
@@ -17,7 +21,7 @@ After you commit, push with: `git push -u origin <branch-name>`
 | See current branch | `git branch` |
 | Use stable code | `git checkout main` |
 | Start a new experiment | `git checkout main` then `git checkout -b <new-branch-name>` |
-| Save a script change | `git add beyond-manzanar-2026-07-31-6wErk78Y/custom-script.js` then `git commit` |
+| Save a script change | `git add beyond-manzanar-2026-09-02-sl5oKWTD/custom-script.js` then `git commit` |
 | Push feature branch | `git push -u origin <branch-name>` |
 
 ---

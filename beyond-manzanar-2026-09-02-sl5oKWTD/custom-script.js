@@ -12,6 +12,19 @@ const ASSET_IDS = {
   monument: 481244,
   shoji: 481245,
   trigger: 481246,
+  radio: 483627,
+  gong: 483629,
+  wind: 483630,
+  azan: 483631,
+};
+
+// The downloaded export contains no audio artworks, so locally these load
+// straight from ./Audio instead. In NAC the artworks above win.
+const AUDIO_FILES = {
+  gong: 'kane1-8m.wav',
+  azan: 'azan2-8m.wav',
+  wind: 'wind2a11-8m.wav',
+  radio: 'documentsRecentlyDiscovered_22kH8m-g2.wav',
 };
 
 // Lowercase filename fragments, tried in order against fileName/prettyFileName/title
@@ -70,7 +83,8 @@ const CONFIG = {
     azanAtMs: 6000,
     azanVolume: 0.5,
     azanDuckedVolume: 0.5 / 3, // azanIntensity / 3 while the radio plays
-    azanFallbackMs: 26000, // azan2-8m.wav runs 26s; used only until it's uploaded
+    azanFallbackMs: 26000, // azan2-8m.wav runs 26s; safety net if it can't play
+    localAudioPath: '../../Audio/',
     // PS_monument is a 45×45 box; radio starts 5s after the player steps in
     radioRadius: 22.5,
     radioDelayMs: 5000,
@@ -124,6 +138,7 @@ const state = {
   barrackOpenScheduled: false,
   assets: {},
   missingWarned: {},
+  audioFallback: {},
   scene1: {
     started: false,
     monumentFaded: false,
@@ -1087,24 +1102,41 @@ function fadeArtwork(artwork, from, to, durationMs, onDone) {
   });
 }
 
-function playAudioAsset(key, volume, loop) {
+// NAC's own playAudioOnce/stopAudio just drive artwork.element, so using the
+// element directly keeps one code path for artworks and local files alike.
+function getAudioElement(key) {
   const art = getAsset(key);
-  if (!art || !art.element) return null;
-  art.element.volume = volume;
-  art.element.loop = !!loop;
-  art.element.currentTime = 0;
-  const played = loop ? art.element.play() : nac.playAudioOnce(art);
+  if (art && art.element) return art.element;
+
+  if (state.audioFallback[key]) return state.audioFallback[key];
+  const file = AUDIO_FILES[key];
+  if (!file) return null;
+
+  const el = new Audio(scene1().localAudioPath + file);
+  el.preload = 'auto';
+  state.audioFallback[key] = el;
+  console.log('[BM scene1] local audio file for', key, '→', file);
+  return el;
+}
+
+function playAudioAsset(key, volume, loop) {
+  const el = getAudioElement(key);
+  if (!el) return null;
+  el.volume = volume;
+  el.loop = !!loop;
+  el.currentTime = 0;
+  const played = el.play();
   if (played && typeof played.catch === 'function') {
     played.catch(function (err) {
       console.warn('[BM scene1] audio blocked:', key, err && err.name);
     });
   }
-  return art;
+  return el;
 }
 
 function setAzanVolume(v) {
-  const azan = getAsset('azan');
-  if (azan && azan.element) azan.element.volume = v;
+  const el = getAudioElement('azan');
+  if (el) el.volume = v;
 }
 
 // Everything except the ground grid and the monument starts hidden
@@ -1167,14 +1199,14 @@ function switchOffMonumentIfRadioDone() {
 }
 
 function startRadioBroadcast() {
-  const radio = getAsset('radio');
-  if (!radio || !radio.element) {
+  const el = getAudioElement('radio');
+  if (!el) {
     state.scene1.radioDone = true;
     switchOffMonumentIfRadioDone();
     return;
   }
   state.scene1.radioPlaying = true;
-  radio.element.onended = function () {
+  el.onended = function () {
     state.scene1.radioPlaying = false;
     state.scene1.radioDone = true;
     setAzanVolume(scene1().azanVolume);
@@ -1225,8 +1257,8 @@ function fadeInCamp() {
   if (state.scene1.campShown) return;
   state.scene1.campShown = true;
 
-  const wind = getAsset('wind');
-  if (wind && wind.element) wind.element.volume = 0.4;
+  const windEl = getAudioElement('wind');
+  if (windEl) windEl.volume = 0.4;
 
   state.barrackDoorPhase = 'closed';
   fadeArtwork(getBarrackClosed(), 0, 1, scene1().campFadeMs);
@@ -1236,17 +1268,19 @@ function fadeInCamp() {
 }
 
 function playAzan() {
-  const azan = getAsset('azan');
-  if (!azan || !azan.element) {
+  const el = getAudioElement('azan');
+  if (!el) {
     window.setTimeout(fadeInCamp, scene1().azanFallbackMs);
     return;
   }
-  azan.element.onended = fadeInCamp;
+  el.onended = fadeInCamp;
   playAudioAsset(
     'azan',
     state.scene1.radioStarted ? scene1().azanDuckedVolume : scene1().azanVolume,
     false
   );
+  // fadeInCamp is idempotent, so this only matters if playback never starts
+  window.setTimeout(fadeInCamp, scene1().azanFallbackMs + 4000);
 }
 
 function startScene1() {

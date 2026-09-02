@@ -96,5 +96,12 @@ From export `beyond-manzanar-2026-09-02-sl5oKWTD` (published 2026-09-02).
 | 483438 | groundColor | 0, -850, 84.38 |
 | 483439 | fullPano | 0, 1000, 0 |
 | 483441 | groundImage | 0, 1, 0 |
+| 483627 | documentsRecentlyDiscovered (voice) | spatial, at monument |
+| 483629 | kane1-8m (gong) | global |
+| 483630 | wind2a11-8m (wind loop) | global |
+| 483631 | azan2-8m (azan) | global |
 
-No audio artworks are placed in the space yet.
+Locally the export has no audio artworks, so the script falls back to
+`beyond-manzanar-2026-09-02-sl5oKWTD/Audio/*.wav`.
+
+Still not placed in the space: `fence_All.glb`, `towers_All.glb`.

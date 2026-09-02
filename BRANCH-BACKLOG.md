@@ -27,7 +27,7 @@ After you commit, push with: `git push -u origin <branch-name>`
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
 | `main` | **Stable** | (after shoji-v3 merge) | Barrack + jump + hidden cube + shoji stairs/walls + stairs-face railing beside door gap. | Multi-door cube ID list. |
-| `scene1-desert` | **In progress** | this branch | Scene 1 opening from the VRML: wind + gong, monument body fades at t+4s over 6s, azan at t+6s, azan end → camp fades in → sky barrier → doors open + shoji on. Monument calligraphy holds until the radio broadcast ends. Assets resolve by filename, so new uploads need no IDs. Lives in `beyond-manzanar-2026-09-02-NBsEyGgC/custom-script.js`. | Needs gong/azan/wind audio uploaded; confirm ground + pano handling. |
+| `scene1-desert` | **In progress** | this branch | Scene 1 opening from the VRML: wind + gong, monument body fades at t+4s over 6s, azan at t+6s, azan end → camp fades in → sky barrier → doors open + shoji on. Monument calligraphy holds until the radio broadcast ends. Assets resolve by filename, so new uploads need no IDs. Lives in `beyond-manzanar-2026-09-02-sl5oKWTD/custom-script.js`. | No audio artwork is placed in the space yet — gong, azan, wind and the radio broadcast all need uploading. |
 | `barrack-doors` | **In progress** | this branch | Barracks start closed → open after 3s → seal closed after entry; collisions use closed mesh so you can’t walk back out. Includes shoji-height + fog/camera far fixes for tunnel. | Confirm in NAC; more barrack pairs later. |
 | `shoji-height` | **In progress** | commit `a400f7f` | Fix shoji stair height in NAC Preview: steps no longer skip when `mode` is `edit-3d`. | Merge after confirm. |
 | `audio-monument` | **In progress** | commit `21b17ee` | Play `documentsRecentlyDiscovered` voice; hide monument (`481244`) when it ends. | Rebase onto main after `shoji-height` merges. |
@@ -82,8 +82,19 @@ Hard refresh after script changes: `Cmd+Shift+R`
 
 | ID | Asset |
 |----|--------|
-| 481241 | barrack_block_open |
-| 481790 | barrack_block_closed (stacked on open) |
-| 481244 | fading_monument |
-| 481245 | shoji |
-| 481246 | triggerCube (barrack entry) |
+From export `beyond-manzanar-2026-09-02-sl5oKWTD` (published 2026-09-02).
+
+| ID | Asset | Position |
+|----|--------|----------|
+| 481241 | barrack_block_open | 20, 12.51, -20 |
+| 481790 | barrack_block_closed (stacked on open) | 20, 12.51, -20 |
+| 481244 | fading_monument | 20, 10, -20 |
+| 481245 | shoji | -83.23, 15.14, -7.83 |
+| 481246 | triggerCube (barrack entry) | 86.23, 4.31, -126.73 |
+| 483435 | skybarriar_All | 0, 254.74, 0 |
+| 483437 | skyColor | 0, 1000, 0 |
+| 483438 | groundColor | 0, -850, 84.38 |
+| 483439 | fullPano | 0, 1000, 0 |
+| 483441 | groundImage | 0, 1, 0 |
+
+No audio artworks are placed in the space yet.

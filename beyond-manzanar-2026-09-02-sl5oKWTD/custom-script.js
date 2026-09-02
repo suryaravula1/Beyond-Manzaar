@@ -70,7 +70,7 @@ const CONFIG = {
     azanAtMs: 6000,
     azanVolume: 0.5,
     azanDuckedVolume: 0.5 / 3, // azanIntensity / 3 while the radio plays
-    azanFallbackMs: 12000, // if azan2-8m.wav isn't uploaded yet
+    azanFallbackMs: 26000, // azan2-8m.wav runs 26s; used only until it's uploaded
     // PS_monument is a 45×45 box; radio starts 5s after the player steps in
     radioRadius: 22.5,
     radioDelayMs: 5000,

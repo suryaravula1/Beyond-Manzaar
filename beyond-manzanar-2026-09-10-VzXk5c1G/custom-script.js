@@ -106,10 +106,12 @@ const CONFIG = {
     doorsOpenAfterSkyMs: 2000,
     // North left/right fence pop in/out (VRML-style); center stays once camp is up
     fencePopRadius: 80,
-    // Material names read out of fading_monument.glb — the body fades, the
-    // calligraphy planes (front01/back01) hold until the radio finishes.
+    // Body = stone boxes/cones (fade). Faces = calligraphy planes (always visible
+    // from the start — VRML: "front01 contains ireito kanji, does NOT get faded").
     monumentBodyMaterials: ['mon_mat1'],
     monumentFaceMaterials: ['ireito-128', '1943y8m-128'],
+    monumentBodyNodes: ['Box01', 'Box02', 'Box03', 'Cone01', 'Cone02'],
+    monumentFaceNodes: ['front01', 'back01'],
   },
 
   // Shoji temple — step up + wall collisions (tune in Preview)
@@ -161,6 +163,7 @@ const state = {
     radioDone: false,
     campShown: false,
     shojiShown: false,
+    facesPrepared: false,
     fenceSideShown: { northLeft: false, northRight: false },
   },
 };
@@ -1061,6 +1064,33 @@ function forEachMaterial(root, fn) {
   });
 }
 
+function nodeNameMatches(node, names) {
+  if (!node || !node.name) return false;
+  const n = String(node.name);
+  for (let i = 0; i < names.length; i++) {
+    if (n === names[i] || n.indexOf(names[i]) === 0) return true;
+  }
+  return false;
+}
+
+function forEachMonumentPart(root, nodeNames, fn) {
+  if (!root) return;
+  root.traverse(function (child) {
+    if (!child.isMesh) return;
+    // Match the mesh or any ancestor (GLBs often nest mesh under Name_root)
+    let n = child;
+    let matched = false;
+    while (n) {
+      if (nodeNameMatches(n, nodeNames)) {
+        matched = true;
+        break;
+      }
+      n = n.parent;
+    }
+    if (matched) fn(child);
+  });
+}
+
 // Per-material fade — nac.setArtworkOpacity works on a whole artwork, but the
 // monument body and its calligraphy faces have to fade independently.
 function setMaterialGroupOpacity(root, names, opacity) {
@@ -1078,6 +1108,75 @@ function setMaterialGroupVisible(root, names, visible) {
     if (names.indexOf(String(mat.name)) === -1) return;
     mesh.visible = !!visible;
   });
+}
+
+function setMonumentBodyOpacity(root, opacity) {
+  const bodyNodes = scene1().monumentBodyNodes;
+  const bodyMats = scene1().monumentBodyMaterials;
+  forEachMonumentPart(root, bodyNodes, function (mesh) {
+    mesh.visible = opacity > 0.02;
+    mesh.renderOrder = 0;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (let i = 0; i < mats.length; i++) {
+      const mat = mats[i];
+      if (!mat) continue;
+      mat.transparent = true;
+      mat.opacity = opacity;
+      // Once fading, stop writing depth so the calligraphy planes show through
+      mat.depthWrite = opacity >= 0.99;
+      mat.needsUpdate = true;
+    }
+  });
+  // Also catch by material name if node names differ after import
+  setMaterialGroupOpacity(root, bodyMats, opacity);
+}
+
+// Calligraphy must read from t0 — not only after the stone fades away
+function prepareMonumentFaces(root) {
+  if (!root) return;
+  const faceNodes = scene1().monumentFaceNodes;
+  const faceMats = scene1().monumentFaceMaterials;
+
+  forEachMonumentPart(root, faceNodes, function (mesh) {
+    mesh.visible = true;
+    mesh.renderOrder = 2; // draw after stone so text isn't buried
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (let i = 0; i < mats.length; i++) {
+      const mat = mats[i];
+      if (!mat) continue;
+      mat.transparent = true; // textures have alpha around the characters
+      mat.opacity = 1;
+      mat.depthWrite = true;
+      mat.depthTest = true;
+      mat.side = THREE.DoubleSide;
+      // Pull slightly toward camera in depth to beat coplanar body faces
+      mat.polygonOffset = true;
+      mat.polygonOffsetFactor = -2;
+      mat.polygonOffsetUnits = -2;
+      mat.needsUpdate = true;
+    }
+  });
+
+  forEachMaterial(root, function (mat, mesh) {
+    if (faceMats.indexOf(String(mat.name)) === -1) return;
+    mesh.visible = true;
+    mesh.renderOrder = 2;
+    mat.transparent = true;
+    mat.opacity = 1;
+    mat.depthWrite = true;
+    mat.side = THREE.DoubleSide;
+    mat.polygonOffset = true;
+    mat.polygonOffsetFactor = -2;
+    mat.polygonOffsetUnits = -2;
+    mat.needsUpdate = true;
+  });
+}
+
+function setMonumentFacesVisible(root, visible) {
+  forEachMonumentPart(root, scene1().monumentFaceNodes, function (mesh) {
+    mesh.visible = !!visible;
+  });
+  setMaterialGroupVisible(root, scene1().monumentFaceMaterials, visible);
 }
 
 function fadeArtwork(artwork, from, to, durationMs, onDone) {
@@ -1171,9 +1270,9 @@ function hideCampForScene1() {
 
   const mon = getAsset('monument');
   if (mon && mon.object3D) {
-    setMaterialGroupOpacity(mon.object3D, scene1().monumentBodyMaterials, 1);
-    setMaterialGroupVisible(mon.object3D, scene1().monumentBodyMaterials, true);
-    setMaterialGroupVisible(mon.object3D, scene1().monumentFaceMaterials, true);
+    setMonumentBodyOpacity(mon.object3D, 1);
+    prepareMonumentFaces(mon.object3D);
+    state.scene1.facesPrepared = true;
   }
 }
 
@@ -1237,11 +1336,15 @@ function updateNorthFencePop() {
 function fadeOutMonumentBody() {
   const mon = getAsset('monument');
   if (!mon || !mon.object3D) return;
-  const body = scene1().monumentBodyMaterials;
+  // Keep calligraphy readable while the stone dissolves
+  prepareMonumentFaces(mon.object3D);
 
   const finish = function () {
-    setMaterialGroupOpacity(mon.object3D, body, 0);
-    setMaterialGroupVisible(mon.object3D, body, false);
+    setMonumentBodyOpacity(mon.object3D, 0);
+    forEachMonumentPart(mon.object3D, scene1().monumentBodyNodes, function (mesh) {
+      mesh.visible = false;
+    });
+    setMaterialGroupVisible(mon.object3D, scene1().monumentBodyMaterials, false);
     state.scene1.monumentFaded = true;
     switchOffMonumentIfRadioDone();
   };
@@ -1256,7 +1359,9 @@ function fadeOutMonumentBody() {
     to: { v: 0 },
     duration: scene1().monumentFadeMs,
     onFrame: function (o) {
-      setMaterialGroupOpacity(mon.object3D, body, o.v);
+      setMonumentBodyOpacity(mon.object3D, o.v);
+      // Re-assert faces every frame — NAC/three transparency sort can bury them
+      prepareMonumentFaces(mon.object3D);
     },
     onComplete: finish,
   });
@@ -1271,7 +1376,7 @@ function switchOffMonumentIfRadioDone() {
   if (state.scene1.radioStarted && !state.scene1.radioDone) return;
   const mon = getAsset('monument');
   if (!mon) return;
-  setMaterialGroupVisible(mon.object3D, scene1().monumentFaceMaterials, false);
+  setMonumentFacesVisible(mon.object3D, false);
   setArtworkShown(mon, false);
   console.log('[BM scene1] monument off');
 }
@@ -1435,6 +1540,15 @@ space.onFrame = () => {
   }
   if (!state.proximityWired) setupProximityEntry();
   hideTriggerCubeVisual();
+  // Monument GLB may finish loading after afterInit — pin calligraphy as soon as it's ready
+  if (CONFIG.scene1.enabled && !state.scene1.facesPrepared) {
+    const mon = getAsset('monument');
+    if (mon && mon.object3D) {
+      prepareMonumentFaces(mon.object3D);
+      state.scene1.facesPrepared = true;
+      console.log('[BM scene1] monument calligraphy prepared');
+    }
+  }
   checkProximityEntry();
   updateNorthFencePop();
   applyShojiSteps();

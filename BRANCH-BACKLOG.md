@@ -30,7 +30,7 @@ After you commit, push with: `git push -u origin <branch-name>`
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
 | `main` | **Stable** | (after shoji-v3 merge) | Barrack + jump + hidden cube + shoji stairs/walls + stairs-face railing beside door gap. | Multi-door cube ID list. |
-| `scene1-desert` | **In progress** | this branch | Scene 1: wind/gong, monument fade, azan → camp (closed barracks + Tower All + North center fence) → sky barrier → doors/shoji. North left/right fence proximity pop. Lives in `beyond-manzanar-2026-09-10-VzXk5c1G/custom-script.js`. | Tune `fencePopRadius`; individual tower billboarding later; 3rd barrack from Tyler Friday. |
+| `scene1-desert` | **In progress** | this branch | Scene 1 master clock 0–49s: body fade 0–5, voice 26s + calligraphy until 26, camp+all fences 26–32, sky banners 40–49, doors at 49. Fence collision after camp. Lives in `beyond-manzanar-2026-09-10-VzXk5c1G/custom-script.js`. | Tune fence collision; `fencePopEnabled` later; 3rd barrack Friday. |
 | `barrack-doors` | **In progress** | this branch | Barracks start closed → open after 3s → seal closed after entry; collisions use closed mesh so you can’t walk back out. Includes shoji-height + fog/camera far fixes for tunnel. | Confirm in NAC; more barrack pairs later. |
 | `shoji-height` | **In progress** | commit `a400f7f` | Fix shoji stair height in NAC Preview: steps no longer skip when `mode` is `edit-3d`. | Merge after confirm. |
 | `audio-monument` | **In progress** | commit `21b17ee` | Play `documentsRecentlyDiscovered` voice; hide monument (`481244`) when it ends. | Rebase onto main after `shoji-height` merges. |
@@ -110,6 +110,22 @@ From export `beyond-manzanar-2026-09-10-VzXk5c1G` (published 2026-09-10).
 | 484169 | north_right_fence (proximity pop) | 0, 0, 0 |
 
 Fence All is hidden in NAC / not in this export. Local audio fallback: `Audio/*.wav`.
+
+### Scene 1 master clock (keep for later)
+
+Absolute times from first interaction / Scene 1 start:
+
+| Time | Event |
+|------|--------|
+| 0–5s | Outer monument fades; calligraphy stays |
+| 0–26s | Voice audio (`documentsRecentlyDiscovered`) |
+| 25–26s | Calligraphy fades; audio ends at 26s |
+| 26–32s | Closed barracks + **all** fences + Tower All fade in; stay forever; collision |
+| 32–40s | Hold |
+| 40–49s | Sky banners (`skybarriar`) fade in |
+| 49s | Windows/doors open |
+
+**FUTURE:** North left/right proximity pop (`fencePopEnabled: false` for now). Placement cubes in fence/tower GLBs are collision-disabled in script.
 
 ### Tyler fence / tower notes (2026-09)
 

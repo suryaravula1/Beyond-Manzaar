@@ -80,34 +80,46 @@ const CONFIG = {
   // Logs every artwork id/name once on load — needed to wire new Scene 1 assets
   logArtworkInventory: true,
 
-  // Scene 1 (desert opening). Timings come from run_beyond_manzanarV2.1h_SJMA.wrl:
-  // set_Gong() fires wind + gong at t0, monument fade at t+4s, azan at t+6s.
-  // Monument fade length is TransClock cycleInterval 6.0 in proto-monfade1a.wrl.
+  // -------------------------------------------------------------------------
+  // SCENE 1 TIMELINE (master clock from first interaction) — keep for later
+  // -------------------------------------------------------------------------
+  //  0–5s   Outer monument (stone) fades out; calligraphy stays visible
+  //  0–26s  Voice audio plays (documentsRecentlyDiscovered, 26s)
+  //  25–26s Calligraphy fades out; audio ends at 26s
+  //  26–32s Closed barracks + ALL fences (+ Tower All) fade in (6s)
+  //         Barracks stay forever; fence/barrack collision — user can't leave camp
+  //  32–40s Hold
+  //  40–49s Sky banners (skybarriar) fade in slowly (9s)
+  //  49s    Windows/doors open (open barrack + shoji)
+  //
+  // FUTURE (not active now): North left/right fence proximity pop-in/out
+  // (VRML-style). Toggle with fencePopEnabled once we revisit that effect.
+  // -------------------------------------------------------------------------
   scene1: {
     enabled: true,
-    // Audio can't autoplay before a user gesture, so the clock starts on first
-    // interaction; this is the fallback if that never fires.
-    autoStartMs: 8000,
-    windVolume: 0.4 / 4, // windIntensity / 4
-    monumentFadeAtMs: 4000,
-    monumentFadeMs: 6000,
-    azanAtMs: 6000,
-    azanVolume: 0.5,
-    azanDuckedVolume: 0.5 / 3, // azanIntensity / 3 while the radio plays
-    azanFallbackMs: 26000, // azan2-8m.wav runs 26s; safety net if it can't play
+    autoStartMs: 8000, // fallback if no click; clock still starts on first interaction
+    windVolume: 0.4 / 4,
     localAudioPath: '../../Audio/',
-    // PS_monument is a 45×45 box; radio starts 5s after the player steps in
-    radioRadius: 22.5,
-    radioDelayMs: 5000,
-    // "azan finished → camp1 fades in" … "X seconds later, barrier sky1 fades in"
-    campFadeMs: 4000,
-    skyBarrierDelayMs: 6000,
-    skyBarrierFadeMs: 4000,
-    doorsOpenAfterSkyMs: 2000,
-    // North left/right fence pop in/out (VRML-style); center stays once camp is up
+    voiceVolume: 1,
+    voiceDurationMs: 26000,
+
+    monumentBodyFadeAtMs: 0,
+    monumentBodyFadeMs: 5000, // 0 → 5s
+    calligraphyFadeAtMs: 25000, // hold text until ~25s
+    calligraphyFadeMs: 1000, // gone by 26s with the voice
+
+    campAtMs: 26000,
+    campFadeMs: 6000, // 26 → 32s
+
+    skyBarrierAtMs: 40000,
+    skyBarrierFadeMs: 9000, // 40 → 49s
+
+    doorsAtMs: 49000,
+
+    // FUTURE: set true to restore left/right proximity pop instead of always-on
+    fencePopEnabled: false,
     fencePopRadius: 80,
-    // Body = stone boxes/cones (fade). Faces = calligraphy planes (always visible
-    // from the start — VRML: "front01 contains ireito kanji, does NOT get faded").
+
     monumentBodyMaterials: ['mon_mat1'],
     monumentFaceMaterials: ['ireito-128', '1943y8m-128'],
     monumentBodyNodes: ['Box01', 'Box02', 'Box03', 'Cone01', 'Cone02'],
@@ -156,12 +168,14 @@ const state = {
   audioFallback: {},
   scene1: {
     started: false,
+    startedAt: 0,
     monumentFaded: false,
-    radioWired: false,
-    radioStarted: false,
-    radioPlaying: false,
-    radioDone: false,
+    calligraphyGone: false,
+    voiceStarted: false,
+    voiceDone: false,
     campShown: false,
+    skyBarrierShown: false,
+    doorsOpened: false,
     shojiShown: false,
     facesPrepared: false,
     fenceSideShown: { northLeft: false, northRight: false },
@@ -332,6 +346,27 @@ function setArtworkShown(artwork, shown) {
     nac.setArtworkOpacity(artwork, shown ? 1 : 0);
   } catch (e) {}
   if (artwork.object3D) artwork.object3D.visible = !!shown;
+}
+
+// Tyler's export cubes are for NAC placement only — never draw or collide with them
+function disablePlacementHelpers(artwork) {
+  if (!artwork || !artwork.object3D || artwork._bmPlacementDisabled) return;
+  artwork.object3D.traverse(function (child) {
+    const name = String(child.name || '');
+    if (!/placementcube/i.test(name)) return;
+    child.visible = false;
+    child.traverse(function (c) {
+      c.visible = false;
+      if (c.isMesh) c.raycast = function () {};
+    });
+  });
+  artwork._bmPlacementDisabled = true;
+}
+
+function prepareCampCollisionMeshes() {
+  ['towerAll', 'northCenter', 'northLeft', 'northRight', 'tower'].forEach(function (key) {
+    disablePlacementHelpers(getAsset(key));
+  });
 }
 
 function applyBarrackDoorVisuals() {
@@ -662,10 +697,20 @@ function enforceWallCollisions() {
   }
 
   // Barrack mesh collisions (and shoji mesh for interior walls)
+  // After camp fades in, fences also block so the player can't walk out of camp
   const walls = [getBarrack(), shojiActive() ? getShoji() : null];
+  if (state.scene1.campShown) {
+    walls.push(
+      getAsset('northCenter'),
+      getAsset('northLeft'),
+      getAsset('northRight'),
+      getAsset('towerAll')
+    );
+  }
   for (let i = 0; i < walls.length; i++) {
     const art = walls[i];
     if (!art || !art.object3D) continue;
+    if (art.object3D.visible === false) continue;
     const hit = castMeshRay(art.object3D, state.prevX, pos.y, state.prevZ, pos.x, pos.z);
     if (hit) {
       // Allow shoji mesh hits ONLY at the stairs doorway — not the whole center aisle
@@ -1179,6 +1224,25 @@ function setMonumentFacesVisible(root, visible) {
   setMaterialGroupVisible(root, scene1().monumentFaceMaterials, visible);
 }
 
+function setMonumentFaceOpacity(root, opacity) {
+  const faceNodes = scene1().monumentFaceNodes;
+  const faceMats = scene1().monumentFaceMaterials;
+  forEachMonumentPart(root, faceNodes, function (mesh) {
+    mesh.visible = opacity > 0.02;
+    mesh.renderOrder = 2;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    for (let i = 0; i < mats.length; i++) {
+      const mat = mats[i];
+      if (!mat) continue;
+      mat.transparent = true;
+      mat.opacity = opacity;
+      mat.depthWrite = opacity >= 0.99;
+      mat.needsUpdate = true;
+    }
+  });
+  setMaterialGroupOpacity(root, faceMats, opacity);
+}
+
 function fadeArtwork(artwork, from, to, durationMs, onDone) {
   if (!artwork) {
     if (onDone) onDone();
@@ -1265,6 +1329,9 @@ function hideCampForScene1() {
   setArtworkShown(getAsset('northRight'), false);
   state.scene1.campShown = false;
   state.scene1.shojiShown = false;
+  state.scene1.skyBarrierShown = false;
+  state.scene1.doorsOpened = false;
+  state.scene1.calligraphyGone = false;
   state.scene1.fenceSideShown.northLeft = false;
   state.scene1.fenceSideShown.northRight = false;
 
@@ -1282,7 +1349,6 @@ function artworkWorldPos(art) {
     art.object3D.updateWorldMatrix(true, true);
     const v = new THREE.Vector3();
     art.object3D.getWorldPosition(v);
-    // Group models sit at origin with geometry offset — use mesh AABB center when available
     const box = getMeshBox(art);
     if (box) {
       return new THREE.Vector3(
@@ -1307,9 +1373,11 @@ function isNearArtworkXZ(pos, art, radius) {
   return Math.sqrt(dx * dx + dz * dz) <= radius;
 }
 
-// VRML-style: north center stays; left/right pop when the player approaches
+// FUTURE: VRML-style left/right pop. Off by default (fencePopEnabled: false) —
+// all fences currently fade in with the barracks and stay.
 function updateNorthFencePop() {
   if (!CONFIG.scene1.enabled || !state.scene1.campShown) return;
+  if (!scene1().fencePopEnabled) return;
   const pos = getPlayerWorld();
   if (!pos) return;
 
@@ -1336,7 +1404,6 @@ function updateNorthFencePop() {
 function fadeOutMonumentBody() {
   const mon = getAsset('monument');
   if (!mon || !mon.object3D) return;
-  // Keep calligraphy readable while the stone dissolves
   prepareMonumentFaces(mon.object3D);
 
   const finish = function () {
@@ -1346,7 +1413,7 @@ function fadeOutMonumentBody() {
     });
     setMaterialGroupVisible(mon.object3D, scene1().monumentBodyMaterials, false);
     state.scene1.monumentFaded = true;
-    switchOffMonumentIfRadioDone();
+    console.log('[BM scene1] monument body gone — calligraphy holds');
   };
 
   if (typeof nac.tween !== 'function') {
@@ -1357,135 +1424,146 @@ function fadeOutMonumentBody() {
   nac.tween({
     from: { v: 1 },
     to: { v: 0 },
-    duration: scene1().monumentFadeMs,
+    duration: scene1().monumentBodyFadeMs,
     onFrame: function (o) {
       setMonumentBodyOpacity(mon.object3D, o.v);
-      // Re-assert faces every frame — NAC/three transparency sort can bury them
       prepareMonumentFaces(mon.object3D);
     },
     onComplete: finish,
   });
 }
 
-// VRML switchOffMon(): once faded, the calligraphy only disappears if the radio
-// broadcast is not playing. Otherwise it waits for the voice to end.
-function switchOffMonumentIfRadioDone() {
-  if (!state.scene1.monumentFaded) return;
-  // radioStarted covers the 5s gap between entering the radius and playback,
-  // so a fade finishing in that window doesn't cut the calligraphy early
-  if (state.scene1.radioStarted && !state.scene1.radioDone) return;
+function fadeOutCalligraphy() {
+  if (state.scene1.calligraphyGone) return;
   const mon = getAsset('monument');
-  if (!mon) return;
-  setMonumentFacesVisible(mon.object3D, false);
-  setArtworkShown(mon, false);
-  console.log('[BM scene1] monument off');
-}
-
-function startRadioBroadcast() {
-  const el = getAudioElement('radio');
-  if (!el) {
-    state.scene1.radioDone = true;
-    switchOffMonumentIfRadioDone();
+  if (!mon || !mon.object3D) {
+    state.scene1.calligraphyGone = true;
     return;
   }
-  state.scene1.radioPlaying = true;
-  el.onended = function () {
-    state.scene1.radioPlaying = false;
-    state.scene1.radioDone = true;
-    setAzanVolume(scene1().azanVolume);
-    switchOffMonumentIfRadioDone();
+
+  const finish = function () {
+    setMonumentFaceOpacity(mon.object3D, 0);
+    setMonumentFacesVisible(mon.object3D, false);
+    setArtworkShown(mon, false);
+    state.scene1.calligraphyGone = true;
+    console.log('[BM scene1] calligraphy off');
   };
-  playAudioAsset('radio', 1, false);
-  console.log('[BM scene1] radio broadcast');
+
+  if (typeof nac.tween !== 'function') {
+    finish();
+    return;
+  }
+
+  nac.tween({
+    from: { v: 1 },
+    to: { v: 0 },
+    duration: scene1().calligraphyFadeMs,
+    onFrame: function (o) {
+      setMonumentFaceOpacity(mon.object3D, o.v);
+    },
+    onComplete: finish,
+  });
 }
 
-function wireMonumentRadio() {
-  if (state.scene1.radioWired) return;
-  const mon = getAsset('monument');
-  if (!mon) return;
-  if (typeof nac.onUserAvatarEntersArtworkRadius !== 'function') return;
-
-  state.scene1.radioWired = true;
-  nac.onUserAvatarEntersArtworkRadius(mon, scene1().radioRadius, function () {
-    if (state.scene1.radioStarted) return;
-    state.scene1.radioStarted = true;
-    setAzanVolume(scene1().azanDuckedVolume);
-    window.setTimeout(startRadioBroadcast, scene1().radioDelayMs);
-  });
+function startVoiceAudio() {
+  if (state.scene1.voiceStarted) return;
+  state.scene1.voiceStarted = true;
+  const el = getAudioElement('radio');
+  if (!el) {
+    console.warn('[BM scene1] voice audio missing — timeline still runs on clock');
+    window.setTimeout(function () {
+      state.scene1.voiceDone = true;
+    }, scene1().voiceDurationMs);
+    return;
+  }
+  el.onended = function () {
+    state.scene1.voiceDone = true;
+    console.log('[BM scene1] voice ended');
+  };
+  playAudioAsset('radio', scene1().voiceVolume, false);
+  // Hard stop at 26s in case the file is longer / loops oddly
+  window.setTimeout(function () {
+    if (!state.scene1.voiceDone) {
+      try {
+        el.pause();
+      } catch (e) {}
+      state.scene1.voiceDone = true;
+    }
+  }, scene1().voiceDurationMs + 200);
+  console.log('[BM scene1] voice started (26s)');
 }
 
 function showShojiTemple() {
   const shoji = getShoji();
   if (!shoji) return;
-  fadeArtwork(shoji, 0, 1, scene1().campFadeMs);
+  fadeArtwork(shoji, 0, 1, 2000);
   state.scene1.shojiShown = true;
 }
 
 function openBarrackDoorsForScene1() {
-  if (state.barrackDoorPhase !== 'closed') return;
+  if (state.scene1.doorsOpened) return;
+  if (state.barrackDoorPhase === 'open' || state.barrackDoorPhase === 'sealed') return;
+  state.scene1.doorsOpened = true;
   state.barrackDoorPhase = 'open';
   applyBarrackDoorVisuals();
   showShojiTemple();
-  console.log('[BM scene1] doors open, shoji on');
+  console.log('[BM scene1] t=49s doors/windows open');
 }
 
 function fadeInSkyBarrier() {
-  fadeArtwork(getAsset('skyBarrier'), 0, 1, scene1().skyBarrierFadeMs, function () {
-    window.setTimeout(openBarrackDoorsForScene1, scene1().doorsOpenAfterSkyMs);
-  });
+  if (state.scene1.skyBarrierShown) return;
+  state.scene1.skyBarrierShown = true;
+  fadeArtwork(getAsset('skyBarrier'), 0, 1, scene1().skyBarrierFadeMs);
+  console.log('[BM scene1] t=40s sky banners fade in');
 }
 
-// azan ends → camp1 fades in with its doors still shut, wind comes up to full
+// t=26s → closed barracks + ALL fences + towers, stay forever
 function fadeInCamp() {
   if (state.scene1.campShown) return;
   state.scene1.campShown = true;
+  prepareCampCollisionMeshes();
 
   const windEl = getAudioElement('wind');
   if (windEl) windEl.volume = 0.4;
 
   state.barrackDoorPhase = 'closed';
-  fadeArtwork(getBarrackClosed(), 0, 1, scene1().campFadeMs);
-  fadeArtwork(getAsset('towerAll'), 0, 1, scene1().campFadeMs);
-  fadeArtwork(getAsset('northCenter'), 0, 1, scene1().campFadeMs);
-  // Left/right stay hidden until proximity pop
-  setArtworkShown(getAsset('northLeft'), false);
-  setArtworkShown(getAsset('northRight'), false);
-  console.log('[BM scene1] camp fades in (barracks + towers + north center fence)');
-
-  window.setTimeout(fadeInSkyBarrier, scene1().campFadeMs + scene1().skyBarrierDelayMs);
-}
-
-function playAzan() {
-  const el = getAudioElement('azan');
-  if (!el) {
-    window.setTimeout(fadeInCamp, scene1().azanFallbackMs);
-    return;
+  const fadeMs = scene1().campFadeMs;
+  fadeArtwork(getBarrackClosed(), 0, 1, fadeMs);
+  fadeArtwork(getAsset('towerAll'), 0, 1, fadeMs);
+  fadeArtwork(getAsset('northCenter'), 0, 1, fadeMs);
+  // All fences together (left/right not waiting on proximity)
+  if (!scene1().fencePopEnabled) {
+    fadeArtwork(getAsset('northLeft'), 0, 1, fadeMs);
+    fadeArtwork(getAsset('northRight'), 0, 1, fadeMs);
+    state.scene1.fenceSideShown.northLeft = true;
+    state.scene1.fenceSideShown.northRight = true;
+  } else {
+    setArtworkShown(getAsset('northLeft'), false);
+    setArtworkShown(getAsset('northRight'), false);
   }
-  el.onended = fadeInCamp;
-  playAudioAsset(
-    'azan',
-    state.scene1.radioStarted ? scene1().azanDuckedVolume : scene1().azanVolume,
-    false
-  );
-  // fadeInCamp is idempotent, so this only matters if playback never starts
-  window.setTimeout(fadeInCamp, scene1().azanFallbackMs + 4000);
+  console.log('[BM scene1] t=26s camp fades in (barracks + fences + towers)');
 }
 
 function startScene1() {
   if (state.scene1.started) return;
   state.scene1.started = true;
-  console.log('[BM scene1] start');
+  state.scene1.startedAt = performance.now();
+  console.log('[BM scene1] start — 0–49s master clock');
 
   playAudioAsset('wind', scene1().windVolume, true);
   playAudioAsset('gong', 1, false);
+  startVoiceAudio();
 
-  window.setTimeout(fadeOutMonumentBody, scene1().monumentFadeAtMs);
-  window.setTimeout(playAzan, scene1().azanAtMs);
+  // Absolute timeline from t0 (see CONFIG.scene1 comment block)
+  window.setTimeout(fadeOutMonumentBody, scene1().monumentBodyFadeAtMs);
+  window.setTimeout(fadeOutCalligraphy, scene1().calligraphyFadeAtMs);
+  window.setTimeout(fadeInCamp, scene1().campAtMs);
+  window.setTimeout(fadeInSkyBarrier, scene1().skyBarrierAtMs);
+  window.setTimeout(openBarrackDoorsForScene1, scene1().doorsAtMs);
 }
 
 function setupScene1() {
   hideCampForScene1();
-  wireMonumentRadio();
 
   if (typeof nac.setOnFirstInteraction === 'function') {
     nac.setOnFirstInteraction(startScene1);
@@ -1550,6 +1628,7 @@ space.onFrame = () => {
     }
   }
   checkProximityEntry();
+  if (state.scene1.campShown) prepareCampCollisionMeshes();
   updateNorthFencePop();
   applyShojiSteps();
   clampElevatedBesideStairs();

@@ -118,14 +118,14 @@ Absolute times from first interaction / Scene 1 start:
 | Time | Event |
 |------|--------|
 | 0–5s | Outer monument fades; calligraphy stays |
-| 0–26s | Voice audio (`documentsRecentlyDiscovered`) |
-| 25–26s | Calligraphy fades; audio ends at 26s |
+| 0–26s | `wind2a11` loops; `documents` + `azan` play once (26s). No `kane1`. |
+| 25–26s | Calligraphy fades; 26s clips end |
 | 26–32s | Closed barracks + **all** fences + Tower All fade in; stay forever; collision |
 | 32–40s | Hold |
 | 40–49s | Sky banners (`skybarriar`) fade in |
-| 49s | Windows/doors open |
+| 49s | Windows/doors open — **shoji stays hidden** (later scene) |
 
-**FUTURE:** North left/right proximity pop (`fencePopEnabled: false` for now). Placement cubes in fence/tower GLBs are collision-disabled in script.
+**FUTURE:** North left/right proximity pop (`fencePopEnabled: false`). Shoji temple. Kane1 gong. Placement cubes collision-disabled.
 
 ### Tyler fence / tower notes (2026-09)
 

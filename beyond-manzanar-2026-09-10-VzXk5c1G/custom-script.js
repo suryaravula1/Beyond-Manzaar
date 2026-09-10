@@ -83,40 +83,46 @@ const CONFIG = {
   // -------------------------------------------------------------------------
   // SCENE 1 TIMELINE (master clock from first interaction) — keep for later
   // -------------------------------------------------------------------------
+  //  Audio: wind2a11 loops for the whole scene.
+  //         documentsRecentlyDiscovered + azan each play once (26s), then stop.
+  //         kane1 (gong) — NOT used in Scene 1 (leave for later).
   //  0–5s   Outer monument (stone) fades out; calligraphy stays visible
-  //  0–26s  Voice audio plays (documentsRecentlyDiscovered, 26s)
-  //  25–26s Calligraphy fades out; audio ends at 26s
+  //  0–26s  documents + azan play once
+  //  25–26s Calligraphy fades out; both 26s clips end
   //  26–32s Closed barracks + ALL fences (+ Tower All) fade in (6s)
   //         Barracks stay forever; fence/barrack collision — user can't leave camp
   //  32–40s Hold
   //  40–49s Sky banners (skybarriar) fade in slowly (9s)
-  //  49s    Windows/doors open (open barrack + shoji)
+  //  49s    Windows/doors open (open barrack only — shoji stays hidden; later scene)
   //
-  // FUTURE (not active now): North left/right fence proximity pop-in/out
-  // (VRML-style). Toggle with fencePopEnabled once we revisit that effect.
+  // FUTURE: North left/right fence proximity pop (fencePopEnabled).
+  // FUTURE: Shoji temple appears in a later scene — keep hidden in Scene 1.
+  // FUTURE: kane1 gong if needed again.
   // -------------------------------------------------------------------------
   scene1: {
     enabled: true,
-    autoStartMs: 8000, // fallback if no click; clock still starts on first interaction
+    autoStartMs: 8000,
     windVolume: 0.4 / 4,
     localAudioPath: '../../Audio/',
     voiceVolume: 1,
+    azanVolume: 0.5,
     voiceDurationMs: 26000,
+    playGong: false, // kane1 — leave out of Scene 1 for now
+    showShojiInScene1: false, // shoji is a later scene
 
     monumentBodyFadeAtMs: 0,
-    monumentBodyFadeMs: 5000, // 0 → 5s
-    calligraphyFadeAtMs: 25000, // hold text until ~25s
-    calligraphyFadeMs: 1000, // gone by 26s with the voice
+    monumentBodyFadeMs: 5000,
+    calligraphyFadeAtMs: 25000,
+    calligraphyFadeMs: 1000,
 
     campAtMs: 26000,
-    campFadeMs: 6000, // 26 → 32s
+    campFadeMs: 6000,
 
     skyBarrierAtMs: 40000,
-    skyBarrierFadeMs: 9000, // 40 → 49s
+    skyBarrierFadeMs: 9000,
 
     doorsAtMs: 49000,
 
-    // FUTURE: set true to restore left/right proximity pop instead of always-on
     fencePopEnabled: false,
     fencePopRadius: 80,
 
@@ -173,6 +179,8 @@ const state = {
     calligraphyGone: false,
     voiceStarted: false,
     voiceDone: false,
+    azanStarted: false,
+    azanDone: false,
     campShown: false,
     skyBarrierShown: false,
     doorsOpened: false,
@@ -421,6 +429,8 @@ function getTriggerBox() {
 
 // The temple only switches on late in Scene 1 — no invisible walls before that
 function shojiActive() {
+  // Scene 1 keeps shoji fully off — it belongs to a later scene
+  if (CONFIG.scene1.enabled && !scene1().showShojiInScene1) return false;
   return !CONFIG.scene1.enabled || state.scene1.shojiShown;
 }
 
@@ -1465,35 +1475,73 @@ function fadeOutCalligraphy() {
   });
 }
 
-function startVoiceAudio() {
-  if (state.scene1.voiceStarted) return;
-  state.scene1.voiceStarted = true;
-  const el = getAudioElement('radio');
-  if (!el) {
-    console.warn('[BM scene1] voice audio missing — timeline still runs on clock');
-    window.setTimeout(function () {
-      state.scene1.voiceDone = true;
-    }, scene1().voiceDurationMs);
-    return;
-  }
-  el.onended = function () {
-    state.scene1.voiceDone = true;
-    console.log('[BM scene1] voice ended');
-  };
-  playAudioAsset('radio', scene1().voiceVolume, false);
-  // Hard stop at 26s in case the file is longer / loops oddly
+function stopAudioAfterMs(key, el, doneFlag, ms) {
   window.setTimeout(function () {
-    if (!state.scene1.voiceDone) {
-      try {
+    if (state.scene1[doneFlag]) return;
+    try {
+      if (el) {
         el.pause();
-      } catch (e) {}
-      state.scene1.voiceDone = true;
+        el.currentTime = 0;
+      }
+    } catch (e) {}
+    state.scene1[doneFlag] = true;
+    console.log('[BM scene1]', key, 'stopped at', ms + 'ms');
+  }, ms + 200);
+}
+
+// documents + azan: play once (26s), never again. Wind loops separately.
+function startScene1Audio() {
+  // Wind — loop for the whole scene
+  playAudioAsset('wind', scene1().windVolume, true);
+
+  // Kane1 / gong — intentionally skipped in Scene 1
+  if (scene1().playGong) playAudioAsset('gong', 1, false);
+
+  // documentsRecentlyDiscovered — once, 26s
+  if (!state.scene1.voiceStarted) {
+    state.scene1.voiceStarted = true;
+    const voice = getAudioElement('radio');
+    if (voice) {
+      voice.loop = false;
+      voice.onended = function () {
+        state.scene1.voiceDone = true;
+        console.log('[BM scene1] documents ended');
+      };
+      playAudioAsset('radio', scene1().voiceVolume, false);
+      stopAudioAfterMs('documents', voice, 'voiceDone', scene1().voiceDurationMs);
+      console.log('[BM scene1] documents started (once, 26s)');
+    } else {
+      console.warn('[BM scene1] documents audio missing');
+      window.setTimeout(function () {
+        state.scene1.voiceDone = true;
+      }, scene1().voiceDurationMs);
     }
-  }, scene1().voiceDurationMs + 200);
-  console.log('[BM scene1] voice started (26s)');
+  }
+
+  // azan — once, 26s
+  if (!state.scene1.azanStarted) {
+    state.scene1.azanStarted = true;
+    const azan = getAudioElement('azan');
+    if (azan) {
+      azan.loop = false;
+      azan.onended = function () {
+        state.scene1.azanDone = true;
+        console.log('[BM scene1] azan ended');
+      };
+      playAudioAsset('azan', scene1().azanVolume, false);
+      stopAudioAfterMs('azan', azan, 'azanDone', scene1().voiceDurationMs);
+      console.log('[BM scene1] azan started (once, 26s)');
+    } else {
+      console.warn('[BM scene1] azan audio missing');
+      window.setTimeout(function () {
+        state.scene1.azanDone = true;
+      }, scene1().voiceDurationMs);
+    }
+  }
 }
 
 function showShojiTemple() {
+  if (!scene1().showShojiInScene1) return;
   const shoji = getShoji();
   if (!shoji) return;
   fadeArtwork(shoji, 0, 1, 2000);
@@ -1506,8 +1554,9 @@ function openBarrackDoorsForScene1() {
   state.scene1.doorsOpened = true;
   state.barrackDoorPhase = 'open';
   applyBarrackDoorVisuals();
-  showShojiTemple();
-  console.log('[BM scene1] t=49s doors/windows open');
+  // Shoji stays hidden in Scene 1 — later scene
+  if (scene1().showShojiInScene1) showShojiTemple();
+  console.log('[BM scene1] t=49s doors/windows open (shoji still hidden)');
 }
 
 function fadeInSkyBarrier() {
@@ -1550,9 +1599,7 @@ function startScene1() {
   state.scene1.startedAt = performance.now();
   console.log('[BM scene1] start — 0–49s master clock');
 
-  playAudioAsset('wind', scene1().windVolume, true);
-  playAudioAsset('gong', 1, false);
-  startVoiceAudio();
+  startScene1Audio();
 
   // Absolute timeline from t0 (see CONFIG.scene1 comment block)
   window.setTimeout(fadeOutMonumentBody, scene1().monumentBodyFadeAtMs);

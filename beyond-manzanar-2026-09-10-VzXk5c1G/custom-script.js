@@ -1309,6 +1309,7 @@ function getAudioElement(key) {
 function playAudioAsset(key, volume, loop) {
   const el = getAudioElement(key);
   if (!el) return null;
+  if (el._bmFinished) return el; // one-shot already spent — never restart
   el.volume = volume;
   el.loop = !!loop;
   el.currentTime = 0;
@@ -1321,9 +1322,99 @@ function playAudioAsset(key, volume, loop) {
   return el;
 }
 
+// NAC spatial audio re-triggers when you walk in range. After a one-shot finishes
+// (and always for kane1), block element.play and keep the clip paused.
+function lockAudioFromReplay(key) {
+  const art = getAsset(key);
+  const el = getAudioElement(key);
+  if (el) {
+    el._bmFinished = true;
+    el.loop = false;
+    try {
+      el.pause();
+      el.currentTime = 0;
+    } catch (e) {}
+    if (!el._bmPlayLocked) {
+      el._bmPlayLocked = true;
+      const orig = el.play.bind(el);
+      el.play = function () {
+        if (el._bmFinished) {
+          try {
+            el.pause();
+            el.currentTime = 0;
+          } catch (e) {}
+          return Promise.resolve();
+        }
+        return orig();
+      };
+    }
+  }
+  if (art) {
+    // Kill NAC proximity radius so walking back doesn't restart it
+    art.maxAudibleRadius = 0;
+    try {
+      if (typeof nac.stopAudio === 'function') nac.stopAudio(art);
+    } catch (e) {}
+  }
+}
+
+function silenceGongForever() {
+  // kane1 must never play in Scene 1 — NAC still auto-plays it near spawn
+  const art = getAsset('gong');
+  const el = getAudioElement('gong');
+  if (el) {
+    el.volume = 0;
+    el.loop = false;
+    el._bmFinished = true;
+    try {
+      el.pause();
+      el.currentTime = 0;
+    } catch (e) {}
+  }
+  lockAudioFromReplay('gong');
+  if (art) {
+    art.maxAudibleRadius = 0;
+    art.maxVolume = 0;
+  }
+}
+
+function markOneShotFinished(key, doneFlag) {
+  state.scene1[doneFlag] = true;
+  lockAudioFromReplay(key);
+}
+
+function enforceScene1AudioLocks() {
+  if (!CONFIG.scene1.enabled) return;
+  silenceGongForever();
+
+  // After first listen, keep documents + azan dead even if NAC tries again
+  if (state.scene1.voiceDone) lockAudioFromReplay('radio');
+  if (state.scene1.azanDone) lockAudioFromReplay('azan');
+
+  // If NAC restarted them mid-walk after our timeline ended, cut them off
+  if (state.scene1.voiceStarted && state.scene1.voiceDone) {
+    const v = getAudioElement('radio');
+    if (v && !v.paused) {
+      try {
+        v.pause();
+        v.currentTime = 0;
+      } catch (e) {}
+    }
+  }
+  if (state.scene1.azanStarted && state.scene1.azanDone) {
+    const a = getAudioElement('azan');
+    if (a && !a.paused) {
+      try {
+        a.pause();
+        a.currentTime = 0;
+      } catch (e) {}
+    }
+  }
+}
+
 function setAzanVolume(v) {
   const el = getAudioElement('azan');
-  if (el) el.volume = v;
+  if (el && !el._bmFinished) el.volume = v;
 }
 
 // Everything except the ground grid and the monument starts hidden
@@ -1477,34 +1568,35 @@ function fadeOutCalligraphy() {
 
 function stopAudioAfterMs(key, el, doneFlag, ms) {
   window.setTimeout(function () {
-    if (state.scene1[doneFlag]) return;
-    try {
-      if (el) {
-        el.pause();
-        el.currentTime = 0;
-      }
-    } catch (e) {}
-    state.scene1[doneFlag] = true;
+    if (state.scene1[doneFlag]) {
+      lockAudioFromReplay(key);
+      return;
+    }
+    markOneShotFinished(key, doneFlag);
     console.log('[BM scene1]', key, 'stopped at', ms + 'ms');
   }, ms + 200);
 }
 
-// documents + azan: play once (26s), never again. Wind loops separately.
+// documents + azan: play once (26s), never again. Wind loops. Kane1 never.
 function startScene1Audio() {
+  silenceGongForever();
+
   // Wind — loop for the whole scene
   playAudioAsset('wind', scene1().windVolume, true);
 
-  // Kane1 / gong — intentionally skipped in Scene 1
+  // Kane1 / gong — never in Scene 1
   if (scene1().playGong) playAudioAsset('gong', 1, false);
+  else silenceGongForever();
 
   // documentsRecentlyDiscovered — once, 26s
   if (!state.scene1.voiceStarted) {
     state.scene1.voiceStarted = true;
     const voice = getAudioElement('radio');
     if (voice) {
+      voice._bmFinished = false;
       voice.loop = false;
       voice.onended = function () {
-        state.scene1.voiceDone = true;
+        markOneShotFinished('radio', 'voiceDone');
         console.log('[BM scene1] documents ended');
       };
       playAudioAsset('radio', scene1().voiceVolume, false);
@@ -1523,9 +1615,10 @@ function startScene1Audio() {
     state.scene1.azanStarted = true;
     const azan = getAudioElement('azan');
     if (azan) {
+      azan._bmFinished = false;
       azan.loop = false;
       azan.onended = function () {
-        state.scene1.azanDone = true;
+        markOneShotFinished('azan', 'azanDone');
         console.log('[BM scene1] azan ended');
       };
       playAudioAsset('azan', scene1().azanVolume, false);
@@ -1611,6 +1704,7 @@ function startScene1() {
 
 function setupScene1() {
   hideCampForScene1();
+  silenceGongForever();
 
   if (typeof nac.setOnFirstInteraction === 'function') {
     nac.setOnFirstInteraction(startScene1);
@@ -1665,6 +1759,7 @@ space.onFrame = () => {
   }
   if (!state.proximityWired) setupProximityEntry();
   hideTriggerCubeVisual();
+  enforceScene1AudioLocks();
   // Monument GLB may finish loading after afterInit — pin calligraphy as soon as it's ready
   if (CONFIG.scene1.enabled && !state.scene1.facesPrepared) {
     const mon = getAsset('monument');

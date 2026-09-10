@@ -16,6 +16,12 @@ const ASSET_IDS = {
   gong: 483629,
   wind: 483630,
   azan: 483631,
+  // Tyler 2026-09-10: Fence All is hidden in NAC — use North pieces instead
+  towerAll: 484162,
+  tower: 484163, // individual billboard test piece — not used in Scene 1 fade
+  northCenter: 484167,
+  northLeft: 484168,
+  northRight: 484169,
 };
 
 // The downloaded export contains no audio artworks, so locally these load
@@ -43,6 +49,11 @@ const ASSET_NAMES = {
   gong: ['kane1', 'gong'],
   azan: ['azan'],
   wind: ['wind2a11', 'wind'],
+  towerAll: ['tower_all'],
+  tower: ['tower-ucwzfyoa', 'tower.glb'], // avoid matching tower_all
+  northCenter: ['north_center_fence'],
+  northLeft: ['north_left_fence'],
+  northRight: ['north_right_fence'],
 };
 
 const CONFIG = {
@@ -93,6 +104,8 @@ const CONFIG = {
     skyBarrierDelayMs: 6000,
     skyBarrierFadeMs: 4000,
     doorsOpenAfterSkyMs: 2000,
+    // North left/right fence pop in/out (VRML-style); center stays once camp is up
+    fencePopRadius: 80,
     // Material names read out of fading_monument.glb — the body fades, the
     // calligraphy planes (front01/back01) hold until the radio finishes.
     monumentBodyMaterials: ['mon_mat1'],
@@ -148,6 +161,7 @@ const state = {
     radioDone: false,
     campShown: false,
     shojiShown: false,
+    fenceSideShown: { northLeft: false, northRight: false },
   },
 };
 
@@ -1145,14 +1159,78 @@ function hideCampForScene1() {
   setArtworkShown(getBarrackClosed(), false);
   setArtworkShown(getAsset('skyBarrier'), false);
   setArtworkShown(getShoji(), false);
+  setArtworkShown(getAsset('towerAll'), false);
+  setArtworkShown(getAsset('tower'), false); // individual billboard test — leave off for Scene 1
+  setArtworkShown(getAsset('northCenter'), false);
+  setArtworkShown(getAsset('northLeft'), false);
+  setArtworkShown(getAsset('northRight'), false);
   state.scene1.campShown = false;
   state.scene1.shojiShown = false;
+  state.scene1.fenceSideShown.northLeft = false;
+  state.scene1.fenceSideShown.northRight = false;
 
   const mon = getAsset('monument');
   if (mon && mon.object3D) {
     setMaterialGroupOpacity(mon.object3D, scene1().monumentBodyMaterials, 1);
     setMaterialGroupVisible(mon.object3D, scene1().monumentBodyMaterials, true);
     setMaterialGroupVisible(mon.object3D, scene1().monumentFaceMaterials, true);
+  }
+}
+
+function artworkWorldPos(art) {
+  if (!art) return null;
+  if (art.object3D) {
+    art.object3D.updateWorldMatrix(true, true);
+    const v = new THREE.Vector3();
+    art.object3D.getWorldPosition(v);
+    // Group models sit at origin with geometry offset — use mesh AABB center when available
+    const box = getMeshBox(art);
+    if (box) {
+      return new THREE.Vector3(
+        (box.min.x + box.max.x) * 0.5,
+        (box.min.y + box.max.y) * 0.5,
+        (box.min.z + box.max.z) * 0.5
+      );
+    }
+    return v;
+  }
+  if (art.positionX != null) {
+    return new THREE.Vector3(art.positionX, art.positionY || 0, art.positionZ);
+  }
+  return null;
+}
+
+function isNearArtworkXZ(pos, art, radius) {
+  const c = artworkWorldPos(art);
+  if (!pos || !c) return false;
+  const dx = pos.x - c.x;
+  const dz = pos.z - c.z;
+  return Math.sqrt(dx * dx + dz * dz) <= radius;
+}
+
+// VRML-style: north center stays; left/right pop when the player approaches
+function updateNorthFencePop() {
+  if (!CONFIG.scene1.enabled || !state.scene1.campShown) return;
+  const pos = getPlayerWorld();
+  if (!pos) return;
+
+  const radius = scene1().fencePopRadius;
+  const sides = ['northLeft', 'northRight'];
+  for (let i = 0; i < sides.length; i++) {
+    const key = sides[i];
+    const art = getAsset(key);
+    if (!art) continue;
+    const near = isNearArtworkXZ(pos, art, radius);
+    const shown = !!state.scene1.fenceSideShown[key];
+    if (near && !shown) {
+      state.scene1.fenceSideShown[key] = true;
+      setArtworkShown(art, true);
+      console.log('[BM scene1] fence pop in', key);
+    } else if (!near && shown) {
+      state.scene1.fenceSideShown[key] = false;
+      setArtworkShown(art, false);
+      console.log('[BM scene1] fence pop out', key);
+    }
   }
 }
 
@@ -1262,7 +1340,12 @@ function fadeInCamp() {
 
   state.barrackDoorPhase = 'closed';
   fadeArtwork(getBarrackClosed(), 0, 1, scene1().campFadeMs);
-  console.log('[BM scene1] camp fades in');
+  fadeArtwork(getAsset('towerAll'), 0, 1, scene1().campFadeMs);
+  fadeArtwork(getAsset('northCenter'), 0, 1, scene1().campFadeMs);
+  // Left/right stay hidden until proximity pop
+  setArtworkShown(getAsset('northLeft'), false);
+  setArtworkShown(getAsset('northRight'), false);
+  console.log('[BM scene1] camp fades in (barracks + towers + north center fence)');
 
   window.setTimeout(fadeInSkyBarrier, scene1().campFadeMs + scene1().skyBarrierDelayMs);
 }
@@ -1353,6 +1436,7 @@ space.onFrame = () => {
   if (!state.proximityWired) setupProximityEntry();
   hideTriggerCubeVisual();
   checkProximityEntry();
+  updateNorthFencePop();
   applyShojiSteps();
   clampElevatedBesideStairs();
   enforceWallCollisions();

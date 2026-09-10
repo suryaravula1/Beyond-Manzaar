@@ -2,12 +2,11 @@
 
 **Remote:** [https://github.com/suryaravula1/Beyond-Manzaar](https://github.com/suryaravula1/Beyond-Manzaar)
 
-Git tracks **only** `beyond-manzanar-2026-09-02-sl5oKWTD/custom-script.js` (plus this file).
+Git tracks **only** `beyond-manzanar-2026-09-10-VzXk5c1G/custom-script.js` (plus this file).
 Paste that script into the NAC Script Editor for Test Realm.
 
-The older `beyond-manzanar-2026-07-31-6wErk78Y` export has been deleted. Branches
-before `scene1-desert` still track their script at that old path, so checking one
-out recreates the folder with just that one file.
+Older exports (`sl5oKWTD`, `2026-07-31`) are superseded. Checking out pre-`scene1-desert`
+branches may recreate an old script path from git history.
 
 When you create a new branch, add a row here before you start changing the script.
 After you commit, push with: `git push -u origin <branch-name>`
@@ -21,7 +20,7 @@ After you commit, push with: `git push -u origin <branch-name>`
 | See current branch | `git branch` |
 | Use stable code | `git checkout main` |
 | Start a new experiment | `git checkout main` then `git checkout -b <new-branch-name>` |
-| Save a script change | `git add beyond-manzanar-2026-09-02-sl5oKWTD/custom-script.js` then `git commit` |
+| Save a script change | `git add beyond-manzanar-2026-09-10-VzXk5c1G/custom-script.js` then `git commit` |
 | Push feature branch | `git push -u origin <branch-name>` |
 
 ---
@@ -31,7 +30,7 @@ After you commit, push with: `git push -u origin <branch-name>`
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
 | `main` | **Stable** | (after shoji-v3 merge) | Barrack + jump + hidden cube + shoji stairs/walls + stairs-face railing beside door gap. | Multi-door cube ID list. |
-| `scene1-desert` | **In progress** | this branch | Scene 1 opening from the VRML: wind + gong, monument body fades at t+4s over 6s, azan at t+6s, azan end → camp fades in → sky barrier → doors open + shoji on. Monument calligraphy holds until the radio broadcast ends. Assets resolve by filename, so new uploads need no IDs. Lives in `beyond-manzanar-2026-09-02-sl5oKWTD/custom-script.js`. | No audio artwork is placed in the space yet — gong, azan, wind and the radio broadcast all need uploading. |
+| `scene1-desert` | **In progress** | this branch | Scene 1: wind/gong, monument fade, azan → camp (closed barracks + Tower All + North center fence) → sky barrier → doors/shoji. North left/right fence proximity pop. Lives in `beyond-manzanar-2026-09-10-VzXk5c1G/custom-script.js`. | Tune `fencePopRadius`; individual tower billboarding later; 3rd barrack from Tyler Friday. |
 | `barrack-doors` | **In progress** | this branch | Barracks start closed → open after 3s → seal closed after entry; collisions use closed mesh so you can’t walk back out. Includes shoji-height + fog/camera far fixes for tunnel. | Confirm in NAC; more barrack pairs later. |
 | `shoji-height` | **In progress** | commit `a400f7f` | Fix shoji stair height in NAC Preview: steps no longer skip when `mode` is `edit-3d`. | Merge after confirm. |
 | `audio-monument` | **In progress** | commit `21b17ee` | Play `documentsRecentlyDiscovered` voice; hide monument (`481244`) when it ends. | Rebase onto main after `shoji-height` merges. |
@@ -86,7 +85,7 @@ Hard refresh after script changes: `Cmd+Shift+R`
 
 | ID | Asset |
 |----|--------|
-From export `beyond-manzanar-2026-09-02-sl5oKWTD` (published 2026-09-02).
+From export `beyond-manzanar-2026-09-10-VzXk5c1G` (published 2026-09-10).
 
 | ID | Asset | Position |
 |----|--------|----------|
@@ -100,12 +99,24 @@ From export `beyond-manzanar-2026-09-02-sl5oKWTD` (published 2026-09-02).
 | 483438 | groundColor | 0, -850, 84.38 |
 | 483439 | fullPano | 0, 1000, 0 |
 | 483441 | groundImage | 0, 1, 0 |
-| 483627 | documentsRecentlyDiscovered (voice) | spatial, at monument |
-| 483629 | kane1-8m (gong) | global |
-| 483630 | wind2a11-8m (wind loop) | global |
-| 483631 | azan2-8m (azan) | global |
+| 483627 | documentsRecentlyDiscovered (voice) | 20, 10, -20 |
+| 483629 | kane1-8m (gong) | 20, 10, -20 |
+| 483630 | wind2a11-8m (wind loop) | 33.06, 16.07, -16.95 |
+| 483631 | azan2-8m (azan) | 8.96, 11.34, -8.39 |
+| 484162 | tower_all | 0, 0, 0 |
+| 484163 | tower (individual billboard test) | 446.67, 36.67, -20 |
+| 484167 | north_center_fence (always on after camp) | 0, 0, 0 |
+| 484168 | north_left_fence (proximity pop) | 0, 0, 0 |
+| 484169 | north_right_fence (proximity pop) | 0, 0, 0 |
 
-Locally the export has no audio artworks, so the script falls back to
-`beyond-manzanar-2026-09-02-sl5oKWTD/Audio/*.wav`.
+Fence All is hidden in NAC / not in this export. Local audio fallback: `Audio/*.wav`.
 
-Still not placed in the space: `fence_All.glb`, `towers_All.glb`.
+### Tyler fence / tower notes (2026-09)
+
+| Asset | Role |
+|-------|------|
+| **Tower All** | Group fade-in with camp (1 ID). Later: 8 individual + NAC billboard. |
+| **Individual tower** | Mid-camp test; Scene 1 keeps it hidden for now. |
+| **Fence All** | Hidden — not used. |
+| **North center** | Always visible once camp fades in. |
+| **North left + right** | Proximity pop in/out (`fencePopRadius`, default 80). |

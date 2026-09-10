@@ -706,9 +706,20 @@ function enforceWallCollisions() {
     }
   }
 
-  // Barrack mesh collisions (and shoji mesh for interior walls)
+  // Barrack mesh collisions:
+  // - OPEN barrack has the interior photo/banner walls — always collide with it
+  //   once doors are open or sealed (sealed keeps open visible for interiors).
+  // - CLOSED barrack is the shut-door shell when closed/sealed.
+  const walls = [];
+  if (state.barrackDoorPhase === 'open' || state.barrackDoorPhase === 'sealed') {
+    walls.push(getBarrackOpen());
+  }
+  if (state.barrackDoorPhase === 'closed' || state.barrackDoorPhase === 'sealed') {
+    walls.push(getBarrackClosed());
+  }
+  if (shojiActive()) walls.push(getShoji());
+
   // After camp fades in, fences also block so the player can't walk out of camp
-  const walls = [getBarrack(), shojiActive() ? getShoji() : null];
   if (state.scene1.campShown) {
     walls.push(
       getAsset('northCenter'),
@@ -720,7 +731,7 @@ function enforceWallCollisions() {
   for (let i = 0; i < walls.length; i++) {
     const art = walls[i];
     if (!art || !art.object3D) continue;
-    if (art.object3D.visible === false) continue;
+    // Still collide with open barrack interiors even if a parent flag flipped visible
     const hit = castMeshRay(art.object3D, state.prevX, pos.y, state.prevZ, pos.x, pos.z);
     if (hit) {
       // Allow shoji mesh hits ONLY at the stairs doorway — not the whole center aisle

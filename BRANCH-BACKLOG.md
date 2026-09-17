@@ -126,6 +126,19 @@ Absolute times from first interaction / Scene 1 start:
 
 **FUTURE:** North left/right proximity pop (`fencePopEnabled: false`). Shoji temple. Kane1 gong. Placement cubes collision-disabled.
 
+### Scene 2 — Japanese Paradise Garden (2026-09-17)
+
+| ID | Asset | Role |
+|----|--------|------|
+| 485230 | triggerCube (barracks → garden) | Teleport into garden when entered |
+| 484583 | leaveGarden-trigger-CubeOnly | FUTURE: leave garden |
+| 484578 | shojiTemplate-open | Shown in garden (stairs/open railing) |
+| 484579 | shojiTemplate-closed | Hidden until railing swap |
+| 484580 | japanGardenWall-tree-Colliders | Shown + collision in Scene 2 |
+| 484581 | japanGardenExtras | Shown (decorative) |
+
+Garden stays hidden until Scene 2 trigger. Script: `beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.js`.
+
 ### Tyler fence / tower notes (2026-09)
 
 | Asset | Role |

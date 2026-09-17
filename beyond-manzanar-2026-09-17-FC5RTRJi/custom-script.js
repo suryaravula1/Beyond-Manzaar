@@ -172,7 +172,7 @@ const CONFIG = {
   scene2: {
     enabled: true,
     triggerRadius: 8,
-    hideTriggerCubes: true,
+    hideTriggerCubes: false, // true later — keep visible while we place/test the cube
     // Destination in the garden — tune after Tyler finalizes cube placement.
     // If null XZ, we stand in front of shojiTemplate-open's mesh center.
     teleport: { x: null, y: 12, z: null },

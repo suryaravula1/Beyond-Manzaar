@@ -2,11 +2,10 @@
 
 **Remote:** [https://github.com/suryaravula1/Beyond-Manzaar](https://github.com/suryaravula1/Beyond-Manzaar)
 
-Git tracks **only** `beyond-manzanar-2026-09-10-VzXk5c1G/custom-script.js` (plus this file).
+Git tracks **only** `beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.js` (plus this file).
 Paste that script into the NAC Script Editor for Test Realm.
 
-Older exports (`sl5oKWTD`, `2026-07-31`) are superseded. Checking out pre-`scene1-desert`
-branches may recreate an old script path from git history.
+Older exports are superseded. Checking out older branches may recreate old script paths.
 
 When you create a new branch, add a row here before you start changing the script.
 After you commit, push with: `git push -u origin <branch-name>`
@@ -20,7 +19,7 @@ After you commit, push with: `git push -u origin <branch-name>`
 | See current branch | `git branch` |
 | Use stable code | `git checkout main` |
 | Start a new experiment | `git checkout main` then `git checkout -b <new-branch-name>` |
-| Save a script change | `git add beyond-manzanar-2026-09-10-VzXk5c1G/custom-script.js` then `git commit` |
+| Save a script change | `git add beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.js` then `git commit` |
 | Push feature branch | `git push -u origin <branch-name>` |
 
 ---
@@ -30,7 +29,7 @@ After you commit, push with: `git push -u origin <branch-name>`
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
 | `main` | **Stable** | (after shoji-v3 merge) | Barrack + jump + hidden cube + shoji stairs/walls + stairs-face railing beside door gap. | Multi-door cube ID list. |
-| `scene1-desert` | **In progress** | this branch | Scene 1 master clock 0–49s: body fade 0–5, voice 26s + calligraphy until 26, camp+all fences 26–32, sky banners 40–49, doors at 49. Fence collision after camp. Lives in `beyond-manzanar-2026-09-10-VzXk5c1G/custom-script.js`. | Tune fence collision; `fencePopEnabled` later; 3rd barrack Friday. |
+| `scene1-desert` | **In progress** | this branch | Scene 1 clock + Scene 2 garden teleport. Lives in `beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.js`. | Tune garden teleport dest; leave-garden cube later; open/closed shoji swap; stairs on garden shoji. |
 | `barrack-doors` | **In progress** | this branch | Barracks start closed → open after 3s → seal closed after entry; collisions use closed mesh so you can’t walk back out. Includes shoji-height + fog/camera far fixes for tunnel. | Confirm in NAC; more barrack pairs later. |
 | `shoji-height` | **In progress** | commit `a400f7f` | Fix shoji stair height in NAC Preview: steps no longer skip when `mode` is `edit-3d`. | Merge after confirm. |
 | `audio-monument` | **In progress** | commit `21b17ee` | Play `documentsRecentlyDiscovered` voice; hide monument (`481244`) when it ends. | Rebase onto main after `shoji-height` merges. |

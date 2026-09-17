@@ -22,6 +22,13 @@ const ASSET_IDS = {
   northCenter: 484167,
   northLeft: 484168,
   northRight: 484169,
+  // Scene 2 — Japanese Paradise Garden (2026-09-17 export)
+  scene2Trigger: 485230, // cube in/near barracks → teleport to garden (placement TBD)
+  leaveGardenTrigger: 484583, // garden → camp teleport (wire later)
+  shojiGardenOpen: 484578,
+  shojiGardenClosed: 484579,
+  gardenWallTrees: 484580, // walls + trees with colliders
+  gardenExtras: 484581, // lake / decorative extras (no critical colliders)
 };
 
 // The downloaded export contains no audio artworks, so locally these load
@@ -54,6 +61,12 @@ const ASSET_NAMES = {
   northCenter: ['north_center_fence'],
   northLeft: ['north_left_fence'],
   northRight: ['north_right_fence'],
+  scene2Trigger: ['triggercube'], // prefer ASSET_IDS.scene2Trigger (485230)
+  leaveGardenTrigger: ['leavegarden-trigger', 'leavegarden'],
+  shojiGardenOpen: ['shojitemplate-open'],
+  shojiGardenClosed: ['shojitemplate-closed'],
+  gardenWallTrees: ['japangardenwall-tree', 'japangardenwall'],
+  gardenExtras: ['japangardenextras'],
 };
 
 const CONFIG = {
@@ -148,6 +161,27 @@ const CONFIG = {
     doorDepth: 4, // how far from stairs face mesh hits are ignored (door only)
     stairRun: 5, // world units — both steps happen within this short distance
   },
+
+  // -------------------------------------------------------------------------
+  // SCENE 2 — Japanese Paradise Garden (keep for later expansion)
+  // -------------------------------------------------------------------------
+  // Barrack back-cube (scene2Trigger) → reveal garden + teleport into it.
+  // Leave-garden cube exists but is stubbed for a later pass.
+  // Open vs closed shojiTemplate = railing/stairs asset swap (start with open).
+  // -------------------------------------------------------------------------
+  scene2: {
+    enabled: true,
+    triggerRadius: 8,
+    hideTriggerCubes: true,
+    // Destination in the garden — tune after Tyler finalizes cube placement.
+    // If null XZ, we stand in front of shojiTemplate-open's mesh center.
+    teleport: { x: null, y: 12, z: null },
+    teleportInFrontOfOpenShoji: true,
+    shojiApproachOffset: 22, // world units in front of open temple
+    showClosedShoji: false, // keep closed variant hidden until we need the swap
+    // FUTURE: leaveGardenTrigger → teleport back to barracks block
+    leaveGardenEnabled: false,
+  },
 };
 
 const state = {
@@ -187,6 +221,12 @@ const state = {
     shojiShown: false,
     facesPrepared: false,
     fenceSideShown: { northLeft: false, northRight: false },
+  },
+  scene2: {
+    active: false,
+    triggerWired: false,
+    teleported: false,
+    mustLeaveTrigger: false,
   },
 };
 
@@ -727,6 +767,10 @@ function enforceWallCollisions() {
       getAsset('northRight'),
       getAsset('towerAll')
     );
+  }
+  // Scene 2 garden: walls/trees with colliders (+ open shoji temple mesh)
+  if (state.scene2.active) {
+    walls.push(getAsset('gardenWallTrees'), getAsset('shojiGardenOpen'));
   }
   for (let i = 0; i < walls.length; i++) {
     const art = walls[i];
@@ -1723,6 +1767,175 @@ function setupScene1() {
   window.setTimeout(startScene1, scene1().autoStartMs);
 }
 
+// --- Scene 2: Japanese Paradise Garden ---
+
+function scene2() {
+  return CONFIG.scene2;
+}
+
+function gardenAssetKeys() {
+  return ['shojiGardenOpen', 'shojiGardenClosed', 'gardenWallTrees', 'gardenExtras'];
+}
+
+function hideGardenUntilScene2() {
+  gardenAssetKeys().forEach(function (key) {
+    // Closed shoji stays hidden unless we enable the swap
+    if (key === 'shojiGardenClosed' && !scene2().showClosedShoji) {
+      setArtworkShown(getAsset(key), false);
+      return;
+    }
+    setArtworkShown(getAsset(key), false);
+  });
+  // Leave-garden cube: hide visual; logic later
+  setArtworkShown(getAsset('leaveGardenTrigger'), false);
+  disablePlacementHelpers(getAsset('leaveGardenTrigger'));
+  disablePlacementHelpers(getAsset('scene2Trigger'));
+  state.scene2.active = false;
+}
+
+function showJapaneseGarden() {
+  setArtworkShown(getAsset('shojiGardenOpen'), true);
+  setArtworkShown(getAsset('gardenWallTrees'), true);
+  setArtworkShown(getAsset('gardenExtras'), true);
+  setArtworkShown(
+    getAsset('shojiGardenClosed'),
+    !!scene2().showClosedShoji
+  );
+  ['shojiGardenOpen', 'shojiGardenClosed', 'gardenWallTrees', 'gardenExtras'].forEach(
+    function (key) {
+      disablePlacementHelpers(getAsset(key));
+    }
+  );
+  state.scene2.active = true;
+  console.log('[BM scene2] Japanese garden revealed');
+}
+
+function hideScene2TriggerVisual() {
+  if (!scene2().hideTriggerCubes) return;
+  const t = getAsset('scene2Trigger');
+  if (!t) return;
+  try {
+    nac.setArtworkOpacity(t, 0);
+  } catch (e) {}
+  if (t.object3D) {
+    t.object3D.visible = false;
+    t.object3D.traverse(function (child) {
+      if (child.isMesh) child.visible = false;
+    });
+  }
+  disablePlacementHelpers(t);
+}
+
+function getScene2TriggerBox() {
+  return getMeshBox(getAsset('scene2Trigger'));
+}
+
+function isInScene2TriggerZone(pos) {
+  if (!pos) return false;
+  const box = getScene2TriggerBox();
+  if (box && isInsideBoxXZ(pos, box, 1.5)) return true;
+  const art = getAsset('scene2Trigger');
+  const c = artworkWorldPos(art);
+  if (!c) return false;
+  const dx = pos.x - c.x;
+  const dz = pos.z - c.z;
+  return Math.sqrt(dx * dx + dz * dz) <= scene2().triggerRadius;
+}
+
+function gardenTeleportDestination() {
+  const cfg = scene2().teleport || {};
+  let x = cfg.x;
+  let y = cfg.y != null ? cfg.y : 12;
+  let z = cfg.z;
+
+  if (
+    (x == null || z == null) &&
+    scene2().teleportInFrontOfOpenShoji
+  ) {
+    const shoji = getAsset('shojiGardenOpen');
+    const box = getMeshBox(shoji);
+    if (box) {
+      const cx = (box.min.x + box.max.x) * 0.5;
+      const cz = (box.min.z + box.max.z) * 0.5;
+      // Stand on the stairs-approach side (minZ face → more negative Z)
+      x = x != null ? x : cx;
+      z = z != null ? z : box.min.z - (scene2().shojiApproachOffset || 22);
+      // Floor roughly at box bottom + eye height padding
+      if (cfg.y == null) y = Math.max(box.min.y + 2, 8);
+    } else {
+      const c = artworkWorldPos(shoji);
+      if (c) {
+        x = x != null ? x : c.x;
+        z = z != null ? z : c.z - (scene2().shojiApproachOffset || 22);
+      }
+    }
+  }
+
+  if (x == null) x = 0;
+  if (z == null) z = -20;
+  return { x: x, y: y, z: z };
+}
+
+function teleportPlayerTo(x, y, z) {
+  const mover = getMover();
+  if (!mover) return;
+  mover.position.x = x;
+  mover.position.y = y;
+  mover.position.z = z;
+  setPlayerFloor(y);
+  state.prevX = x;
+  state.prevZ = z;
+  state.groundY = y;
+}
+
+function enterJapaneseGarden() {
+  if (state.scene2.teleported || state.cameraAnimating) return;
+  state.scene2.teleported = true;
+  state.scene2.mustLeaveTrigger = true;
+
+  showJapaneseGarden();
+  const dest = gardenTeleportDestination();
+  teleportPlayerTo(dest.x, dest.y, dest.z);
+  console.log('[BM scene2] teleported to garden', dest);
+}
+
+function checkScene2Trigger() {
+  if (!CONFIG.scene2.enabled) return;
+  if (state.scene2.teleported) return;
+  if (state.cameraAnimating) return;
+
+  const pos = getPlayerWorld();
+  if (!pos || !getAsset('scene2Trigger')) return;
+
+  const inZone = isInScene2TriggerZone(pos);
+  if (state.scene2.mustLeaveTrigger) {
+    if (!inZone) state.scene2.mustLeaveTrigger = false;
+    return;
+  }
+  if (inZone) enterJapaneseGarden();
+}
+
+function setupScene2() {
+  if (!CONFIG.scene2.enabled) return;
+  hideGardenUntilScene2();
+  hideScene2TriggerVisual();
+
+  const trigger = getAsset('scene2Trigger');
+  if (!trigger) {
+    console.warn('[BM scene2] scene2Trigger cube not found');
+    return;
+  }
+  if (state.scene2.triggerWired) return;
+  state.scene2.triggerWired = true;
+
+  if (typeof nac.onUserAvatarEntersArtworkRadius === 'function') {
+    nac.onUserAvatarEntersArtworkRadius(trigger, scene2().triggerRadius, function () {
+      enterJapaneseGarden();
+    });
+  }
+  console.log('[BM scene2] barrack→garden trigger armed', trigger.id);
+}
+
 function clearFogAndExtendCamera() {
   const far = 5000;
   try {
@@ -1760,6 +1973,7 @@ space.afterInit = () => {
     scheduleBarrackOpen();
   }
   setupProximityEntry();
+  setupScene2();
 };
 
 space.onFrame = () => {
@@ -1770,6 +1984,11 @@ space.onFrame = () => {
   }
   if (!state.proximityWired) setupProximityEntry();
   hideTriggerCubeVisual();
+  hideScene2TriggerVisual();
+  if (CONFIG.scene2.enabled && !state.scene2.active) {
+    // Keep garden hidden until teleport (NAC may reset visibility)
+    hideGardenUntilScene2();
+  }
   enforceScene1AudioLocks();
   // Monument GLB may finish loading after afterInit — pin calligraphy as soon as it's ready
   if (CONFIG.scene1.enabled && !state.scene1.facesPrepared) {
@@ -1781,6 +2000,7 @@ space.onFrame = () => {
     }
   }
   checkProximityEntry();
+  checkScene2Trigger();
   if (state.scene1.campShown) prepareCampCollisionMeshes();
   updateNorthFencePop();
   applyShojiSteps();

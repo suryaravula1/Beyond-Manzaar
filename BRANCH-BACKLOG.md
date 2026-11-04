@@ -1,9 +1,32 @@
-# Branch backlog — Test Realm script
+# Branch backlog — Beyond Manzanar
 
 **Remote:** [https://github.com/suryaravula1/Beyond-Manzaar](https://github.com/suryaravula1/Beyond-Manzaar)
 
-Git tracks **only** `beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.js` (plus this file).
-Paste that script into the NAC Script Editor for Test Realm.
+## Active: Production (Nov 2026 handover)
+
+| Item | Path |
+|------|------|
+| **Edit (source)** | `beyond-manzanar-2026-10-16-C5o4kLrD/custom-script.js` |
+| **Paste into NAC** | `beyond-manzanar-2026-10-16-C5o4kLrD/custom-script.nac-paste.js` |
+| **Local preview** | `http://localhost:8769/show/beyond-manzanar-production/` |
+| **Export** | `beyond-manzanar-2026-10-16-C5o4kLrD` |
+| **Handover for Christopher** | `CHRISTOPHER-HANDOVER.md` |
+| **Production reference** | `PRODUCTION.md` |
+
+### Production script status
+
+- Scene 1 + Scene 2 (enter/leave Japanese garden) **working in NAC Production**
+- NAC script limit raised to **128KB** (Don) — paste is readable (comment-stripped), not heavily compressed
+- Garden height still needs final tune; migration corridor next (Test Realm)
+- Flat lighting + FOV APIs from Don available, not fully wired
+
+See **`CHRISTOPHER-HANDOVER.md`** and **`PRODUCTION.md`** for the full handoff.
+
+---
+
+## Older: Test Realm
+
+Git also tracks `beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.js` (Test Realm Scene 1+2).
 
 Older exports are superseded. Checking out older branches may recreate old script paths.
 
@@ -19,7 +42,7 @@ After you commit, push with: `git push -u origin <branch-name>`
 | See current branch | `git branch` |
 | Use stable code | `git checkout main` |
 | Start a new experiment | `git checkout main` then `git checkout -b <new-branch-name>` |
-| Save a script change | `git add beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.js` then `git commit` |
+| Save Production script | `git add beyond-manzanar-2026-09-30-1qTXd3oQ/custom-script.js beyond-manzanar-2026-09-30-1qTXd3oQ/custom-script.nac-paste.js` then `git commit` |
 | Push feature branch | `git push -u origin <branch-name>` |
 
 ---
@@ -29,7 +52,7 @@ After you commit, push with: `git push -u origin <branch-name>`
 | Branch | Status | Script snapshot | What this code does | Still open on this branch |
 |--------|--------|-----------------|---------------------|---------------------------|
 | `main` | **Stable** | (after shoji-v3 merge) | Barrack + jump + hidden cube + shoji stairs/walls + stairs-face railing beside door gap. | Multi-door cube ID list. |
-| `scene1-desert` | **In progress** | this branch | Scene 1 clock + Scene 2 garden teleport. Lives in `beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.js`. | Tune garden teleport dest; leave-garden cube later; open/closed shoji swap; stairs on garden shoji. |
+| `scene1-desert` | **In progress** | this branch | Scene 1 clock + Scene 2 garden (enter/leave teleport, camp hide/restore, stair seal). Lives in `beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.js`. | Confirm leave cube path + closed-shoji collision in Preview. |
 | `barrack-doors` | **In progress** | this branch | Barracks start closed → open after 3s → seal closed after entry; collisions use closed mesh so you can’t walk back out. Includes shoji-height + fog/camera far fixes for tunnel. | Confirm in NAC; more barrack pairs later. |
 | `shoji-height` | **In progress** | commit `a400f7f` | Fix shoji stair height in NAC Preview: steps no longer skip when `mode` is `edit-3d`. | Merge after confirm. |
 | `audio-monument` | **In progress** | commit `21b17ee` | Play `documentsRecentlyDiscovered` voice; hide monument (`481244`) when it ends. | Rebase onto main after `shoji-height` merges. |
@@ -122,22 +145,72 @@ Absolute times from first interaction / Scene 1 start:
 | 26–32s | Closed barracks + **all** fences + Tower All fade in; stay forever; collision |
 | 32–40s | Hold |
 | 40–49s | Sky banners (`skybarriar`) fade in |
-| 49s | Windows/doors open — **shoji stays hidden** (later scene) |
+| 49s | Doors open — keep barrack-back **shield** (`front-open2`); hide doorway fill (`fusuma`) so rectangle is enterable |
 
 **FUTURE:** North left/right proximity pop (`fencePopEnabled: false`). Shoji temple. Kane1 gong. Placement cubes collision-disabled.
 
 ### Scene 2 — Japanese Paradise Garden (2026-09-17)
 
+**Script:** `beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.js`
+
+#### Assets
+
 | ID | Asset | Role |
 |----|--------|------|
-| 485230 | triggerCube (barracks → garden) | Teleport into garden when entered |
-| 484583 | leaveGarden-trigger-CubeOnly | FUTURE: leave garden |
-| 484578 | shojiTemplate-open | Shown in garden (stairs/open railing) |
-| 484579 | shojiTemplate-closed | Hidden until railing swap |
+| 485230 | triggerCube (barracks → garden) | Enter zone → teleport into garden shoji |
+| 484583 | leaveGarden-trigger-CubeOnly | Enter → leave garden to `(-316, 10, -663)` |
+| 484578 | shojiTemplate-open | Open temple **with stairs** (shown on teleport) |
+| 484579 | shojiTemplate-closed | Closed temple **no stairs** (shown after last step down) |
 | 484580 | japanGardenWall-tree-Colliders | Shown + collision in Scene 2 |
-| 484581 | japanGardenExtras | Shown (decorative) |
+| 484581 | japanGardenExtras | Shown (decorative / garden ground extras) |
+| 483441 | groundImage | Camp ground — **hidden** on garden enter |
+| 481241 / 481790 | barrack open / closed | **Hidden** on garden enter |
+| 483435 | skybarriar_All | Sky posters — **hidden** on garden enter |
 
-Garden stays hidden until Scene 2 trigger. Script: `beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.js`.
+#### Flow (current)
+
+1. **Trigger** — walk into Scene 2 cube near barracks.
+2. **Teleport** — land inside open garden shoji at `(-10, 4, 1)`.
+3. **Hide camp** — camp `groundImage`, both barracks, and sky posters hide. Garden assets show (open shoji, walls/trees, extras). Closed shoji stays hidden. `leaveGarden` cube is shown/armed.
+4. **Stairs** — height bands while leaving the temple: **4 → 3.25 → 2.5 → 1.6 → 1** (garden ground).
+5. **Seal** — after the **last step** (off stairs onto garden ground): open shoji hides, **closed shoji** appears.
+6. **No re-entry** — closed temple uses **solid exterior collision** (no door gap) so the player cannot walk back in.
+7. **Leave garden** — enter `leaveGarden-trigger-CubeOnly` (484583) → teleport to **`(-316, 10, -663)`**. Garden hides; barracks + camp ground restore; **sky posters stay hidden**.
+
+#### Config knobs (`CONFIG.scene2`)
+
+| Key | Purpose |
+|-----|---------|
+| `teleport` | Inside open temple `{ x: -10, y: 4, z: 1 }` |
+| `shoji.*` | Stair side, heights, door gap (same model as old shoji) |
+| `hideOldGround` | Hide camp ground on enter |
+| `hideCampBarracks` | Hide barrack open/closed on enter |
+| `hideSkyPosters` | Hide skybarriar on enter (stays hidden after leave) |
+| `sealShojiAfterStairs` | Open→closed swap after last step |
+| `leaveGardenEnabled` | Arm leaveGarden cube |
+| `leaveTeleport` | Exit dest `{ x: -316, y: 10, z: -663 }` |
+| `leaveTriggerRadius` | Proximity radius for leave cube |
+
+#### Changelog
+
+| Date | Change |
+|------|--------|
+| 2026-09-17 | Scene 2 garden teleport wired; hide garden until trigger |
+| 2026-09-17 | Teleport inside open shoji; camp ground hide; deck/stair heights tuned to 4→…→1 |
+| 2026-09-17 | On enter: also hide barracks + sky posters |
+| 2026-09-17 | After last stair step: open→closed shoji swap; closed temple solid collision (no re-entry) |
+| 2026-09-17 | Leave-garden cube → `(-316, 10, -663)`; hide garden; restore barracks + ground; posters stay hidden |
+| 2026-09-17 | **NAC save limit:** full `custom-script.js` (~72KB JSON) fails Script Editor save. Paste **`custom-script.nac-paste.js`** instead (comments stripped, ~60KB JSON). Edit the full file in Cursor; regenerate paste build before NAC. |
+
+**FUTURE:** optional fence/tower hide with camp; re-entry to garden if needed.
+
+### NAC Script Editor notes
+
+- Official warning: code goes in a `<script>` tag; don’t change NAC UI; avoid external loads.
+- **Save error** (“An error occurred when saving this data”) → payload too large (likely ~**64KB** field limit after JSON escaping).
+- **Paste this into NAC:** `beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.nac-paste.js`
+- **Source of truth (with comments):** `beyond-manzanar-2026-09-17-FC5RTRJi/custom-script.js`
+- Ladder/probe test files were temporary and have been removed.
 
 ### Tyler fence / tower notes (2026-09)
 
